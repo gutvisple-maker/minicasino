@@ -1,0 +1,1544 @@
+сделай мини казино на базе даных fire base чисто для моих друзей вход через ведите фио и запоминается устройство и на этом устройстве авто заход в акаунт на сайте есть подброс монетки шансы выйграть 50/50 есть ставка в каждом раунде только 1 победитель если победителей 2 то они снова кидают (только победители) пока не останется 1 победитель также есть ставка и снизу есть панель ставка когда поставил ставку вместо окна ставки появляется окно участвующих и ставка 
+Готово. Приложение собрано и проверено в браузере на двух «устройствах».
+
+Файлы
+
+casino-friends/index.html
+ — весь сайт (вход, комнаты, игра)
+casino-friends/firebase-config.js — вставьте сюда конфиг Firebase
+casino-friends/database.rules.json
+, 
+firebase.json
+ — правила БД и хостинг
+casino-friends/README.md
+ — подключение Firebase и публикация
+casino-friends/dist/casino-friends.html
+ — тот же сайт одним файлом
+Что работает
+
+Вход по ФИО, устройство запоминается (localStorage → players/{deviceId}), дальше автовход без пароля.
+Комната по 5-символьному коду; общий банк и баланс (старт 1000).
+Панель ставки снизу: сумма + Орёл/Решка; после ставки она заменяется окном участников со ставками и статусами.
+Подброс 50/50, выбывание не угадавших, повторные подбросы только среди совпавших, пока не останется один. Победитель получает весь банк раунда.
+Проверено: два игрока в двух вкладках — обычный раунд с выплатой, тай-брейк (двое совпали → перевыбор сторон → один победитель), автовход после перезагрузки, 1440 и 390 px без ошибок в консоли.
+
+Сейчас включён демо-режим (данные в браузере). Чтобы играть между устройствами, заполните 
+firebase-config.js
+ и опубликуйте правила из 
+database.rules.json
+ — пошагово в README. Монеты виртуальные: платежей и реальных ставок в приложении нет.
+
+index.html
+database.rules.json
+firebase.json
+README.md
+casino-friends.html
+https://console.firebase.google.com/project/minigame-b6df4/database/minigame-b6df4-default-rtdb/data/~2F что мне надо загрузить на гитаб?
+На GitHub Pages нужны два файла в корне репозитория (можно добавить третий — README):
+
+index.html
+firebase-config.js
+dist/casino-friends.html
+ загружать не нужно — это тот же сайт одним файлом, но с уже вклеенным конфигом. Если хотите один файл, тогда заполните 
+firebase-config.js
+, пересоберите dist и залейте его как 
+index.html
+.
+
+Перед загрузкой
+
+В 
+firebase-config.js
+ замените PASTE_* на реальные значения: Firebase Console → ⚙️ Project settings → General → Your apps → Web </> → firebaseConfig. Обязательны apiKey и databaseURL (для вашего проекта обычно https://minigame-b6df4-default-rtdb.<регион>.firebasedatabase.app — скопируйте точную строку из конфига).
+Realtime Database → Rules → вставьте содержимое 
+database.rules.json
+ → Publish. Иначе приложение упрётся в permission denied.
+Публикация
+
+Загрузите файлы в репозиторий → Settings → Pages → Source: Deploy from a branch, ветка main, папка 
+(root)
+.
+Сайт будет на https://<логин>.github.io/<репозиторий>/. Ссылку и код комнаты передайте друзьям.
+Два момента: для бесплатного GitHub Pages репозиторий должен быть публичным, а правила БД открытые — значит, адрес базы теоретически доступен всем. Для узкого круга это нормально; если нужна закрытость, лучше Firebase Hosting (в папке уже есть 
+firebase.json
+) или приватный репозиторий на Netlify. Пришлите ваш firebaseConfig — вставлю в файл и пересоберу бандл.
+
+index.html
+database.rules.json
+firebase.json
+// Import the functions you need from the SDKs you need
+import { initializeApp } from "firebase/app";
+import { getAnalytics } from "firebase/analytics";
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
+
+// Your web app's Firebase configuration
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+const firebaseConfig = {
+  apiKey: "AIzaSyDQS1PMNSYwzGKem0o7VYAz0O-22WoOntg",
+  authDomain: "minigame-b6df4.firebaseapp.com",
+  databaseURL: "https://minigame-b6df4-default-rtdb.firebaseio.com",
+  projectId: "minigame-b6df4",
+  storageBucket: "minigame-b6df4.firebasestorage.app",
+  messagingSenderId: "941035034424",
+  appId: "1:941035034424:web:e9fbf8a93aba58e78053cd",
+  measurementId: "G-SJ3WV80QS7"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const analytics = getAnalytics(app);
+Конфиг вставлен и проверен вживую: приложение подключилось к minigame-b6df4, записало игрока и комнату в Realtime Database (тестовые записи я удалил). Бандл пересобран.
+
+Что залить в репозиторий GitHub (корень, ветка main)
+
+index.html
+firebase-config.js
+README.md          (необязательно)
+.nojekyll          (необязательно, пустой файл)
+dist/casino-friends.html
+ заливать не надо, если заливаете два файла выше.
+Альтернатива одним файлом: залить только 
+dist/casino-friends.html
+, переименовав его в 
+index.html
+ — конфиг уже внутри, я его пересобрал.
+firebase.json
+, 
+database.rules.json
+ — для деплоя через CLI, на Pages не нужны.
+Дальше
+
+Repo → Settings → Pages → Source: Deploy from a branch, main, 
+(root)
+.
+Откройте https://<логин>.github.io/<repo>/ — должна открыться форма входа без жёлтой плашки «Демо-режим» (это и значит, что Firebase подключился).
+Если увидите ошибку permission denied — Realtime Database → Rules → вставьте содержимое 
+database.rules.json
+ → Publish.
+Учтите: база сейчас в тестовом режиме (открытые правила), и через 30 дней Firebase заблокирует доступ. Тогда просто опубликуйте правила из 
+database.rules.json
+ — они тоже открытые, но без даты истечения. И репозиторий для бесплатного Pages должен быть публичным.
+
+index.html
+firebase.json
+database.rules.json
+зделай без банка просто ставка 
+Убрал «банк» из интерфейса, выплата осталась прежней: ставки списываются у всех, победитель получает их сумму.
+
+Шапка раунда: «Раунд N · шанс 50/50» вместо «Банк 200».
+Итог: «Победитель — Имя. Забирает ставки всех: 200 монет».
+Панель снизу: «Вы забрали ставки — 200 монет».
+Лобби и README поправлены, 
+dist/casino-friends.html
+ пересобран.
+Проверил на живом Firebase: ставка, запись в базу, ошибок в консоли нет; тестовые записи удалил. На GitHub заливаете те же 
+index.html
+ + 
+firebase-config.js
+ (либо обновлённый 
+dist/casino-friends.html
+ как 
+index.html
+).
+
+index.html
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0f14">
+<title>Монетка — мини-казино для своих</title>
+<style>
+  :root{
+    --bg:#0b0f14;
+    --bg2:#0e151b;
+    --panel:#121a20;
+    --panel2:#16212a;
+    --line:#243540;
+    --text:#e9f1ee;
+    --muted:#8ba3a0;
+    --gold:#ffcf5c;
+    --gold2:#dfa72c;
+    --green:#2ee6a8;
+    --red:#ff5d6c;
+    --radius:16px;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0;
+    background:
+      radial-gradient(1200px 600px at 50% -10%, rgba(255,207,92,.08), transparent 60%),
+      radial-gradient(900px 500px at 100% 0%, rgba(46,230,168,.05), transparent 55%),
+      var(--bg);
+    color:var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    font-size:16px;
+    line-height:1.45;
+    -webkit-font-smoothing:antialiased;
+  }
+  button,input{font:inherit;color:inherit}
+  button{cursor:pointer;border:0;background:none}
+  .hidden{display:none !important}
+  .screen{min-height:100dvh;display:flex;flex-direction:column}
+  .muted{color:var(--muted)}
+  .mono{font-variant-numeric:tabular-nums}
+
+  /* ---------- login ---------- */
+  #screen-login{align-items:center;justify-content:center;padding:24px}
+  .login-card{
+    width:100%;max-width:420px;
+    background:linear-gradient(180deg, rgba(255,255,255,.03), transparent 40%), var(--panel);
+    border:1px solid var(--line);border-radius:22px;
+    padding:30px 26px 26px;
+    box-shadow:0 30px 80px rgba(0,0,0,.45);
+  }
+  .logo{display:flex;align-items:center;gap:12px;margin-bottom:6px}
+  .logo .mark{
+    width:44px;height:44px;border-radius:50%;
+    background:radial-gradient(circle at 35% 30%, #fff3c4, var(--gold) 45%, var(--gold2) 85%);
+    box-shadow:inset 0 -3px 8px rgba(120,70,0,.45), 0 6px 20px rgba(255,207,92,.25);
+    display:grid;place-items:center;color:#5a3b00;font-weight:800;font-size:18px;
+  }
+  .logo h1{font-size:25px;line-height:1;margin:0;letter-spacing:.06em}
+  .logo h1 span{display:block;font-size:11px;letter-spacing:.22em;color:var(--muted);font-weight:600;margin-top:5px}
+  .login-card p.lead{color:var(--muted);margin:14px 0 20px;font-size:14px}
+  .field{margin-bottom:14px}
+  .field label{display:block;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:7px}
+  .field input{
+    width:100%;padding:14px 15px;border-radius:12px;
+    background:#0a1116;border:1px solid var(--line);outline:none;
+    transition:border-color .15s, box-shadow .15s;
+  }
+  .field input:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(255,207,92,.15)}
+  .btn{
+    display:inline-flex;align-items:center;justify-content:center;gap:8px;
+    padding:14px 18px;border-radius:12px;font-weight:700;letter-spacing:.01em;
+    background:var(--panel2);border:1px solid var(--line);color:var(--text);
+    transition:transform .08s, background .15s, border-color .15s;
+  }
+  .btn:active{transform:translateY(1px)}
+  .btn.primary{
+    width:100%;background:linear-gradient(180deg,#ffd97a,var(--gold) 60%,var(--gold2));
+    color:#3a2600;border-color:#f3c44f;box-shadow:0 10px 26px rgba(255,207,92,.18);
+  }
+  .btn.primary:disabled{filter:grayscale(.7) brightness(.7);cursor:not-allowed;box-shadow:none}
+  .btn.green{background:linear-gradient(180deg,#5cf0c0,var(--green) 60%,#19b884);color:#04231a;border-color:#22c795}
+  .btn.ghost{padding:7px 11px;font-size:13px;background:transparent;border:1px solid var(--line);color:var(--muted);border-radius:9px}
+  .btn.ghost:hover{color:var(--text);border-color:#3a5160}
+  .device-note{display:flex;gap:10px;align-items:flex-start;margin-top:16px;font-size:12.5px;color:var(--muted)}
+  .device-note svg{flex:0 0 auto;margin-top:1px;opacity:.8}
+  .demo-banner{
+    margin-top:16px;padding:11px 13px;border-radius:11px;font-size:12.5px;line-height:1.4;
+    background:rgba(255,207,92,.08);border:1px solid rgba(255,207,92,.25);color:#f2dfae;
+  }
+
+  /* ---------- lobby ---------- */
+  #screen-lobby{padding:22px}
+  .topbar{
+    display:flex;align-items:center;gap:16px;flex-wrap:wrap;
+    padding:14px 18px;border-bottom:1px solid var(--line);
+    background:rgba(11,15,20,.7);backdrop-filter:blur(10px);
+    position:sticky;top:0;z-index:20;
+  }
+  .brand{font-weight:800;letter-spacing:.14em;font-size:15px;white-space:nowrap}
+  .brand em{font-style:normal;color:var(--gold)}
+  .brand small{display:block;font-size:10px;letter-spacing:.2em;color:var(--muted);font-weight:600}
+  .topbar .spacer{flex:1}
+  .wallet{display:flex;align-items:center;gap:10px;font-size:14px}
+  .wallet .who{color:var(--muted)}
+  .wallet .bal{
+    font-weight:800;color:var(--gold);font-variant-numeric:tabular-nums;
+    background:rgba(255,207,92,.08);border:1px solid rgba(255,207,92,.22);
+    padding:5px 10px;border-radius:9px;
+  }
+  .lobby-main{width:100%;max-width:880px;margin:0 auto;padding:34px 0}
+  .lobby-main h2{font-size:clamp(24px,4vw,34px);margin:0 0 8px;letter-spacing:.01em}
+  .lobby-main .sub{color:var(--muted);margin:0 0 26px}
+  .lobby-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .panel{
+    background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+    padding:22px;
+  }
+  .panel h3{margin:0 0 6px;font-size:17px}
+  .panel p{color:var(--muted);font-size:13.5px;margin:0 0 16px}
+  .panel .btn{width:100%}
+  .join-row{display:flex;gap:8px}
+  .join-row input{
+    flex:1;min-width:0;padding:13px 14px;border-radius:12px;background:#0a1116;
+    border:1px solid var(--line);outline:none;text-transform:uppercase;letter-spacing:.18em;font-weight:700;
+  }
+  .join-row input:focus{border-color:var(--gold)}
+  .join-row .btn{width:auto;padding:13px 18px}
+  .features{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:26px}
+  .feature{background:var(--bg2);border:1px solid var(--line);border-radius:14px;padding:16px}
+  .feature b{display:block;font-size:13px;margin-bottom:4px}
+  .feature span{font-size:12.5px;color:var(--muted);line-height:1.4}
+
+  /* ---------- room ---------- */
+  #screen-room{min-height:100dvh;padding-bottom:0}
+  .room-code{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted)}
+  .room-code b{color:var(--text);letter-spacing:.2em;font-weight:800;font-variant-numeric:tabular-nums}
+  .room-main{
+    flex:1;display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:22px;
+    width:100%;max-width:1160px;margin:0 auto;padding:24px 18px 18px;
+    align-items:start;
+  }
+  .stage{
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    background:
+      radial-gradient(600px 300px at 50% 0%, rgba(255,207,92,.07), transparent 65%),
+      var(--panel);
+    border:1px solid var(--line);border-radius:22px;
+    padding:26px 22px 30px;min-height:420px;position:relative;overflow:hidden;
+  }
+  .round-line{font-size:13px;color:var(--muted);display:flex;gap:6px;align-items:baseline;flex-wrap:wrap;justify-content:center}
+  .round-line b{color:var(--text);font-variant-numeric:tabular-nums}
+  .round-line .pot{color:var(--gold);font-weight:800}
+  .coin-wrap{perspective:800px;margin:22px 0 8px}
+  .coin{
+    width:132px;height:132px;border-radius:50%;position:relative;
+    display:grid;place-items:center;
+    background:radial-gradient(circle at 34% 28%, #fff6cf, var(--gold) 42%, var(--gold2) 78%, #9c6f12);
+    box-shadow:inset 0 -8px 18px rgba(90,55,0,.5), inset 0 6px 14px rgba(255,255,255,.5), 0 18px 40px rgba(0,0,0,.45), 0 0 40px rgba(255,207,92,.12);
+    color:#4a3000;font-weight:900;font-size:46px;
+    transition:transform .3s ease;
+    will-change:transform;
+  }
+  .coin::after{
+    content:"";position:absolute;inset:10px;border-radius:50%;
+    border:2px dashed rgba(90,55,0,.35);
+  }
+  .coin.idle{animation:idleFloat 3.4s ease-in-out infinite}
+  @keyframes idleFloat{0%,100%{transform:translateY(0) rotate(0)}50%{transform:translateY(-7px) rotate(-3deg)}}
+  .coin.spin{animation:coinSpin .95s cubic-bezier(.3,.7,.4,1) both}
+  @keyframes coinSpin{
+    0%{transform:rotateY(0) scale(1)}
+    25%{transform:rotateY(540deg) translateY(-34px) scale(1.04)}
+    55%{transform:rotateY(1080deg) translateY(-46px) scale(1.06)}
+    100%{transform:rotateY(1800deg) translateY(0) scale(1)}
+  }
+  .coin.reveal{animation:coinPop .45s cubic-bezier(.2,1.4,.4,1) both}
+  @keyframes coinPop{0%{transform:scale(.9)}60%{transform:scale(1.06)}100%{transform:scale(1)}}
+  .coin[data-side="H"]{background:radial-gradient(circle at 34% 28%, #fff6cf, var(--gold) 42%, var(--gold2) 78%, #9c6f12)}
+  .coin[data-side="T"]{background:radial-gradient(circle at 34% 28%, #e3fff4, #4be0b0 42%, #18b083 78%, #0c6b4f);color:#033328}
+  .coin .face-label{font-size:11px;letter-spacing:.2em;color:rgba(74,48,0,.6);position:absolute;bottom:20px;font-weight:700}
+  .coin[data-side="T"] .face-label{color:rgba(3,51,40,.65)}
+  .coin .glyph{line-height:1;transform:translateY(-6px)}
+
+  .flip-status{font-size:15px;color:var(--text);text-align:center;margin-top:14px;min-height:22px;font-weight:600}
+  .flip-status .win{color:var(--gold)}
+  .hint{font-size:12.5px;color:var(--muted);text-align:center;margin-top:6px;min-height:18px}
+  .actions{display:flex;gap:10px;margin-top:18px;flex-wrap:wrap;justify-content:center}
+  .actions .btn{min-width:180px}
+  .round-history{display:flex;gap:6px;margin-top:18px}
+  .round-history .pip{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-size:11px;font-weight:800;background:#0a1116;border:1px solid var(--line);color:var(--muted)}
+  .round-history .pip.h{color:var(--gold);border-color:rgba(255,207,92,.4)}
+  .round-history .pip.t{color:var(--green);border-color:rgba(46,230,168,.35)}
+
+  /* players */
+  .players{
+    background:var(--panel);border:1px solid var(--line);border-radius:22px;
+    padding:18px;position:sticky;top:80px;
+  }
+  .players h2{font-size:13px;text-transform:uppercase;letter-spacing:.14em;color:var(--muted);margin:0 0 14px;display:flex;justify-content:space-between}
+  .players h2 span{color:var(--text)}
+  .players ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+  .pl{
+    display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;
+    padding:10px 11px;border-radius:12px;background:var(--bg2);border:1px solid transparent;
+  }
+  .pl.me{border-color:rgba(255,207,92,.35);background:rgba(255,207,92,.05)}
+  .pl.out{opacity:.5}
+  .pl.won{border-color:rgba(46,230,168,.45);background:rgba(46,230,168,.07)}
+  .pl .av{
+    width:32px;height:32px;border-radius:50%;display:grid;place-items:center;font-weight:800;font-size:13px;
+    background:#1d2b34;color:#b9cfc9;text-transform:uppercase;
+  }
+  .pl.me .av{background:rgba(255,207,92,.2);color:var(--gold)}
+  .pl.won .av{background:rgba(46,230,168,.2);color:var(--green)}
+  .pl .nm{min-width:0}
+  .pl .nm b{display:block;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600}
+  .pl .nm small{display:block;font-size:11.5px;color:var(--muted)}
+  .pl .st{text-align:right;font-size:12px}
+  .pl .st .amount{font-weight:800;font-variant-numeric:tabular-nums;color:var(--gold)}
+  .pl .st .tag{display:block;font-size:10.5px;color:var(--muted);letter-spacing:.04em;text-transform:uppercase}
+  .pl .st .tag.win{color:var(--green)}
+  .pl .st .tag.out{color:var(--red)}
+  .empty-players{font-size:13px;color:var(--muted);padding:8px 2px}
+
+  /* bet bar */
+  .betbar{
+    position:sticky;bottom:0;z-index:30;
+    background:rgba(10,15,20,.92);backdrop-filter:blur(14px);
+    border-top:1px solid var(--line);
+    box-shadow:0 -18px 40px rgba(0,0,0,.35);
+  }
+  .betbar-inner{width:100%;max-width:1160px;margin:0 auto;padding:14px 18px 18px}
+  .bet-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-bottom:12px;font-size:13.5px}
+  .bet-head strong{font-size:15px}
+  .bet-form{display:grid;grid-template-columns:160px 1fr auto;gap:12px;align-items:end}
+  .bet-form label{display:block;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+  .bet-form input{
+    width:100%;padding:13px 14px;border-radius:12px;background:#0a1116;border:1px solid var(--line);
+    outline:none;font-weight:700;font-variant-numeric:tabular-nums;
+  }
+  .bet-form input:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(255,207,92,.12)}
+  .side-pick{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .side{
+    padding:12px 10px;border-radius:12px;border:1px solid var(--line);background:#0a1116;
+    font-weight:700;font-size:14px;color:var(--muted);transition:all .12s;
+  }
+  .side[aria-pressed="true"][data-side="H"]{border-color:var(--gold);background:rgba(255,207,92,.12);color:var(--gold)}
+  .side[aria-pressed="true"][data-side="T"]{border-color:var(--green);background:rgba(46,230,168,.1);color:var(--green)}
+  .side:disabled{opacity:.45;cursor:not-allowed}
+  .bet-form .btn{white-space:nowrap;padding:13px 22px}
+  .quick{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+  .quick button{font-size:12px;padding:6px 10px;border-radius:8px;border:1px solid var(--line);color:var(--muted)}
+  .quick button:hover{color:var(--text);border-color:#3a5160}
+  .bet-participants{display:flex;flex-wrap:wrap;gap:8px}
+  .chip{
+    display:inline-flex;align-items:center;gap:7px;padding:7px 11px;border-radius:999px;
+    background:var(--bg2);border:1px solid var(--line);font-size:12.5px;
+  }
+  .chip b{font-variant-numeric:tabular-nums;color:var(--gold)}
+  .chip .dot{width:7px;height:7px;border-radius:50%;background:var(--muted)}
+  .chip.h .dot{background:var(--gold)}
+  .chip.t .dot{background:var(--green)}
+  .chip.me{border-color:rgba(255,207,92,.4)}
+  .chip.out{opacity:.45;text-decoration:line-through}
+  .bet-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;align-items:center}
+  .bet-note{font-size:12.5px;color:var(--muted)}
+  .winner-banner{
+    display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:12px;
+    background:rgba(46,230,168,.08);border:1px solid rgba(46,230,168,.3);
+  }
+  .winner-banner .cup{font-size:22px}
+
+  /* toast */
+  .toast-wrap{position:fixed;left:50%;bottom:96px;transform:translateX(-50%);z-index:100;display:flex;flex-direction:column;gap:8px;align-items:center;pointer-events:none}
+  .toast{
+    background:#1b2730;border:1px solid var(--line);color:var(--text);
+    padding:10px 16px;border-radius:11px;font-size:13.5px;box-shadow:0 14px 30px rgba(0,0,0,.4);
+    animation:toastIn .2s ease both;max-width:90vw;
+  }
+  .toast.err{border-color:rgba(255,93,108,.5);background:rgba(255,93,108,.12)}
+  @keyframes toastIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+  @media (max-width: 900px){
+    .room-main{grid-template-columns:1fr;padding:16px 12px 12px}
+    .players{position:static;order:-1}
+    .players ul{flex-direction:row;overflow-x:auto;padding-bottom:4px}
+    .pl{min-width:190px;flex:0 0 auto}
+    .bet-form{grid-template-columns:1fr}
+    .bet-form .btn{width:100%}
+    .bet-head{flex-wrap:wrap}
+    .lobby-grid{grid-template-columns:1fr}
+    .features{grid-template-columns:1fr}
+    .topbar{padding:12px 14px;gap:10px}
+    .wallet{font-size:13px}
+  }
+  @media (max-width: 520px){
+    .coin{width:112px;height:112px;font-size:38px}
+    .stage{min-height:360px;padding:20px 14px 24px}
+    .actions .btn{min-width:0;width:100%}
+    .betbar-inner{padding:12px 12px 16px}
+    .logo h1{font-size:22px}
+  }
+  @media (prefers-reduced-motion: reduce){
+    .coin.idle{animation:none}
+    .coin.spin{animation-duration:.01ms}
+    .coin.reveal{animation:none}
+  }
+</style>
+</head>
+<body>
+
+<!-- ======== LOGIN ======== -->
+<section id="screen-login" class="screen">
+  <div class="login-card">
+    <div class="logo">
+      <div class="mark">М</div>
+      <div>
+        <h1>МОНЕТКА <span>мини-казино для своих</span></h1>
+      </div>
+    </div>
+    <p class="lead">Одна комната и одна монета. Ставка в каждом раунде, шанс 50/50, победитель забирает ставки всех.</p>
+    <form id="login-form" autocomplete="on">
+      <div class="field">
+        <label for="fio">Ваше ФИО</label>
+        <input id="fio" name="fio" type="text" placeholder="Иванов Иван Иванович" required autocomplete="name" maxlength="80">
+      </div>
+      <button class="btn primary" type="submit">Войти</button>
+    </form>
+    <div class="device-note">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="2" width="16" height="20" rx="3"/><path d="M11 18h2"/></svg>
+      <span>Устройство запомнится: при следующем заходе вы попадёте в аккаунт автоматически, без ввода имени.</span>
+    </div>
+    <div id="fb-status" class="demo-banner hidden"></div>
+  </div>
+</section>
+
+<!-- ======== LOBBY ======== -->
+<section id="screen-lobby" class="screen hidden">
+  <header class="topbar">
+    <div class="brand">МОНЕТКА<small>для своих</small></div>
+    <div class="spacer"></div>
+    <div class="wallet">
+      <span class="who" id="lobby-name"></span>
+      <span class="bal" id="lobby-balance">0</span>
+      <button class="btn ghost" data-act="topup">пополнить</button>
+      <button class="btn ghost" data-act="logout">сменить профиль</button>
+    </div>
+  </header>
+  <div class="lobby-main">
+    <h2>Стол накрыт</h2>
+    <p class="sub">Создайте комнату и скиньте код друзьям — или вступите в уже открытую.</p>
+    <div class="lobby-grid">
+      <div class="panel">
+        <h3>Создать комнату</h3>
+        <p>Вы станете хозяином стола. Код появится сразу — его нужно передать друзьям.</p>
+        <button class="btn primary" data-act="create-room">Создать комнату</button>
+      </div>
+      <div class="panel">
+        <h3>Войти по коду</h3>
+        <p>Введите код, который прислал друг.</p>
+        <div class="join-row">
+          <input id="join-code" type="text" placeholder="КОД" maxlength="8" autocomplete="off" spellcheck="false" aria-label="Код комнаты">
+          <button class="btn green" data-act="join-room">Войти</button>
+        </div>
+      </div>
+    </div>
+    <div class="features">
+      <div class="feature"><b>50/50</b><span>Орёл или решка — каждый выбирает сторону до подброса.</span></div>
+      <div class="feature"><b>Один победитель</b><span>Совпавшие продолжают, остальные выбывают. Пока не останется один.</span></div>
+      <div class="feature"><b>Ставки</b><span>Каждый ставит перед подбросом, победитель забирает ставки всех.</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ======== ROOM ======== -->
+<section id="screen-room" class="screen hidden">
+  <header class="topbar">
+    <div class="brand">МОНЕТКА<small>для своих</small></div>
+    <div class="room-code">Комната <b id="room-code">—</b><button class="btn ghost" data-act="copy-code">код</button></div>
+    <div class="spacer"></div>
+    <div class="wallet">
+      <span class="who" id="room-name"></span>
+      <span class="bal" id="room-balance">0</span>
+      <button class="btn ghost" data-act="topup">+500</button>
+      <button class="btn ghost" data-act="leave-room">выйти</button>
+    </div>
+  </header>
+
+  <main class="room-main">
+    <div class="stage">
+      <div class="round-line">Раунд <b id="round-num">1</b> · шанс 50/50</div>
+      <div class="coin-wrap">
+        <div class="coin idle" id="coin" data-side="">
+          <span class="glyph" id="coin-face">?</span>
+          <span class="face-label" id="coin-label"></span>
+        </div>
+      </div>
+      <div class="flip-status" id="flip-status">Ждём ставки</div>
+      <div class="hint" id="room-hint"></div>
+      <div class="actions" id="room-actions"></div>
+    </div>
+
+    <aside class="players">
+      <h2>Участники <span id="players-count">0</span></h2>
+      <ul id="players-list"></ul>
+    </aside>
+  </main>
+
+  <footer class="betbar">
+    <div class="betbar-inner" id="betbar"></div>
+  </footer>
+</section>
+
+<div class="toast-wrap" id="toasts"></div>
+
+<script src="firebase-config.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  /* ---------------- helpers ---------------- */
+  var $ = function (s) { return document.querySelector(s); };
+  var ABORT = { __abort: true };
+  var LS_DEVICE = "mtc_device";
+  var LS_DB = "mtc_local_db";
+  var START_BALANCE = 1000;
+  var TOPUP = 500;
+  var CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+
+  function fmt(n) {
+    n = Number(n) || 0;
+    try { return n.toLocaleString("ru-RU"); } catch (e) { return String(n); }
+  }
+  function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  function deepCopy(v) { return v == null ? v : JSON.parse(JSON.stringify(v)); }
+
+  function toast(msg, isErr) {
+    var wrap = $("#toasts");
+    if (!wrap) return;
+    var el = document.createElement("div");
+    el.className = "toast" + (isErr ? " err" : "");
+    el.textContent = msg;
+    wrap.appendChild(el);
+    setTimeout(function () {
+      el.style.transition = "opacity .25s";
+      el.style.opacity = "0";
+      setTimeout(function () { el.remove(); }, 260);
+    }, 2600);
+  }
+
+  /* ---------------- device identity ---------------- */
+  function uuid() {
+    if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+    return "d-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 10);
+  }
+  function getDeviceId() {
+    try {
+      var forced = sessionStorage.getItem("mtc_dev_override");
+      if (!forced) {
+        var params = new URLSearchParams(location.search);
+        var q = params.get("dev");
+        if (!q) {
+          var m = /(?:^|[#&])dev=([A-Za-z0-9_-]{1,24})/.exec(location.hash || "");
+          q = m ? m[1] : null;
+        }
+        if (q) {
+          forced = "dev-" + String(q).toLowerCase();
+          sessionStorage.setItem("mtc_dev_override", forced);
+        }
+      }
+      if (forced) return forced;
+    } catch (e) {}
+    try {
+      var v = localStorage.getItem(LS_DEVICE);
+      if (!v) { v = uuid(); localStorage.setItem(LS_DEVICE, v); }
+      return v;
+    } catch (e) {
+      return "mem-" + uuid();
+    }
+  }
+
+  /* ---------------- state ---------------- */
+  var deviceId = getDeviceId();
+  var me = null;               // {name, balance}
+  var db = null;
+  var dbKind = "";
+  var state = null;            // room state
+  var roomCode = null;
+  var unsubRoom = null;
+  var unsubBalance = null;
+  var lastStageSeen = -1;
+  var spinTimer = null;
+  var settleBusy = false;
+  var pendingSide = "H";
+  var betDraft = "";
+
+  function myEntry() {
+    return state && state.players ? state.players[deviceId] : null;
+  }
+  function playersList() {
+    if (!state || !state.players) return [];
+    return Object.keys(state.players).map(function (k) {
+      var p = state.players[k] || {};
+      return {
+        key: k, name: p.name || "Игрок", bet: Number(p.bet) || 0,
+        side: p.side || null, out: !!p.out, me: k === deviceId
+      };
+    });
+  }
+  function participating() {
+    return playersList().filter(function (p) { return p.bet > 0; });
+  }
+  function aliveList() {
+    return participating().filter(function (p) { return !p.out; });
+  }
+  function readyList() {
+    return participating().filter(function (p) { return !p.out && p.side; });
+  }
+  function sideName(s) { return s === "T" ? "Решка" : s === "H" ? "Орёл" : "—"; }
+  function sideGlyph(s) { return s === "T" ? "Р" : s === "H" ? "О" : "?"; }
+  function genCode() {
+    var out = "";
+    for (var i = 0; i < 5; i++) out += CODE_ALPHABET[Math.floor(Math.random() * CODE_ALPHABET.length)];
+    return out;
+  }
+  function readPath(root, path) {
+    var cur = root;
+    for (var i = 0; i < path.length; i++) {
+      if (cur == null) return null;
+      cur = cur[path[i]];
+    }
+    return cur === undefined ? null : cur;
+  }
+  function writePath(root, path, val) {
+    var cur = root;
+    for (var i = 0; i < path.length - 1; i++) {
+      var k = path[i];
+      if (typeof cur[k] !== "object" || cur[k] === null) cur[k] = {};
+      cur = cur[k];
+    }
+    if (val === null) delete cur[path[path.length - 1]];
+    else cur[path[path.length - 1]] = val;
+  }
+
+  /* ---------------- data layer ---------------- */
+  function hasFirebaseConfig() {
+    var c = window.FIREBASE_CONFIG;
+    return !!(c && c.apiKey && c.databaseURL &&
+      String(c.apiKey).indexOf("PASTE") === -1 &&
+      String(c.databaseURL).indexOf("PASTE") === -1);
+  }
+
+  function makeLocalDB() {
+    var listeners = [];
+    function load() {
+      try {
+        var raw = localStorage.getItem(LS_DB);
+        return raw ? JSON.parse(raw) : {};
+      } catch (e) { return {}; }
+    }
+    var mem = load();
+
+    function emit() {
+      var snapshot = mem;
+      listeners.slice().forEach(function (l) {
+        try { l.cb(readPath(snapshot, l.path)); } catch (e) {}
+      });
+    }
+    function persist() {
+      try { localStorage.setItem(LS_DB, JSON.stringify(mem)); } catch (e) {}
+      emit();
+    }
+
+    window.addEventListener("storage", function (e) {
+      if (e.key === LS_DB) {
+        mem = load();
+        emit();
+      }
+    });
+
+    return {
+      kind: "local",
+      get: function (path) {
+        mem = load();
+        return Promise.resolve(deepCopy(readPath(mem, path)));
+      },
+      on: function (path, cb) {
+        listeners.push({ path: path, cb: cb });
+        return function () {
+          var i = listeners.findIndex(function (l) { return l.cb === cb; });
+          if (i >= 0) listeners.splice(i, 1);
+        };
+      },
+      transact: function (path, fn) {
+        return (async function () {
+          for (var attempt = 0; attempt < 30; attempt++) {
+            var before = load();
+            var cur = deepCopy(readPath(before, path));
+            var out = fn(cur);
+            if (out === ABORT) return { ok: false };
+            await sleep(0);
+            var now = load();
+            if (JSON.stringify(now) !== JSON.stringify(before)) { await sleep(6); continue; }
+            mem = now;
+            writePath(mem, path, deepCopy(out));
+            persist();
+            return { ok: true, value: deepCopy(out) };
+          }
+          return { ok: false };
+        })();
+      },
+      set: function (path, val) {
+        mem = load();
+        writePath(mem, path, deepCopy(val));
+        persist();
+        return Promise.resolve();
+      }
+    };
+  }
+
+  function loadScript(src) {
+    return new Promise(function (resolve, reject) {
+      var s = document.createElement("script");
+      s.src = src;
+      s.onload = function () { resolve(); };
+      s.onerror = function () { reject(new Error("Не удалось загрузить " + src)); };
+      document.head.appendChild(s);
+    });
+  }
+
+  async function initDB() {
+    if (hasFirebaseConfig()) {
+      try {
+        await loadScript("https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js");
+        await loadScript("https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js");
+        var app = firebase.initializeApp(window.FIREBASE_CONFIG);
+        var rtdb = firebase.database(app);
+        db = {
+          kind: "firebase",
+          get: function (path) {
+            return rtdb.ref(path.join("/")).once("value").then(function (snap) { return snap.val(); });
+          },
+          on: function (path, cb, onErr) {
+            var ref = rtdb.ref(path.join("/"));
+            var handler = function (snap) { cb(snap.val()); };
+            var errHandler = function (e) { if (onErr) onErr(e); };
+            ref.on("value", handler, errHandler);
+            return function () { ref.off("value", handler); };
+          },
+          transact: function (path, fn) {
+            return rtdb.ref(path.join("/")).transaction(function (cur) {
+              var out = fn(cur == null ? null : cur);
+              return out === ABORT ? undefined : out;
+            }, undefined, false).then(function (res) {
+              if (!res.committed) return { ok: false };
+              return { ok: true, value: res.snapshot.val() };
+            });
+          },
+          set: function (path, val) {
+            return rtdb.ref(path.join("/")).set(val);
+          }
+        };
+        dbKind = "firebase";
+        return;
+      } catch (e) {
+        console.warn("Firebase init failed, falling back to local demo:", e);
+      }
+    }
+    db = makeLocalDB();
+    dbKind = "local";
+  }
+
+  /* ---------------- identity boot ---------------- */
+  async function loadMe() {
+    var p = await db.get(["players", deviceId]);
+    if (!p || !p.name) return null;
+    return { name: p.name, balance: Number(p.balance) || 0 };
+  }
+
+  async function ensureMe() {
+    var p = await db.get(["players", deviceId]);
+    if (!p) return null;
+    if (p.balance == null) {
+      await db.transact(["players", deviceId], function (cur) {
+        if (!cur) return ABORT;
+        if (cur.balance != null) return ABORT;
+        cur.balance = START_BALANCE;
+        return cur;
+      });
+      p.balance = START_BALANCE;
+    }
+    return { name: p.name, balance: Number(p.balance) || 0 };
+  }
+
+  async function login(name) {
+    name = String(name || "").trim().replace(/\s+/g, " ");
+    if (name.length < 2) { toast("Введите ФИО", true); return; }
+    var existing = await db.get(["players", deviceId]);
+    var rec = existing || {};
+    rec.name = name;
+    if (rec.balance == null) rec.balance = START_BALANCE;
+    rec.device = deviceId;
+    rec.updatedAt = Date.now();
+    await db.set(["players", deviceId], rec);
+    me = { name: name, balance: Number(rec.balance) || 0 };
+    subscribeBalance();
+    showLobby();
+    var hashRoom = readRoomFromHash();
+    if (hashRoom) enterRoom(hashRoom);
+  }
+
+  function subscribeBalance() {
+    if (unsubBalance) unsubBalance();
+    unsubBalance = db.on(["players", deviceId], function (v) {
+      if (v && typeof v.balance === "number") {
+        me.balance = v.balance;
+        updateWallet();
+        render();
+      }
+    });
+  }
+
+  function updateWallet() {
+    if (!me) return;
+    ["#lobby-balance", "#room-balance"].forEach(function (sel) {
+      var el = $(sel);
+      if (el) el.textContent = fmt(me.balance);
+    });
+    ["#lobby-name", "#room-name"].forEach(function (sel) {
+      var el = $(sel);
+      if (el) el.textContent = me.name;
+    });
+  }
+
+  /* ---------------- navigation ---------------- */
+  function showOnly(id) {
+    ["#screen-login", "#screen-lobby", "#screen-room"].forEach(function (sel) {
+      var el = $(sel);
+      if (el) el.classList.toggle("hidden", sel !== id);
+    });
+  }
+  function showLobby() {
+    showOnly("#screen-lobby");
+    updateWallet();
+    var el = $("#fb-status");
+    if (el) el.classList.add("hidden");
+    document.title = "Монетка — лобби";
+  }
+  function showLogin() {
+    showOnly("#screen-login");
+    document.title = "Монетка — вход";
+    var el = $("#fb-status");
+    if (el && dbKind === "local") {
+      el.classList.remove("hidden");
+      el.textContent = "Демо-режим: данные хранятся только в этом браузере. Подключите Firebase (файл firebase-config.js), чтобы играть между устройствами.";
+    }
+  }
+
+  function readRoomFromHash() {
+    var m = /(?:^|[#&/])room=([A-Z0-9]{3,8})/i.exec(location.hash || "");
+    return m ? m[1].toUpperCase() : null;
+  }
+  function setHashRoom(code) {
+    try { history.replaceState(null, "", "#room=" + code); } catch (e) { location.hash = "room=" + code; }
+  }
+
+  /* ---------------- room lifecycle ---------------- */
+  async function createRoom() {
+    if (!me) return;
+    var code = genCode();
+    var initial = {
+      host: deviceId,
+      created: Date.now(),
+      round: 1,
+      phase: "betting",
+      pot: 0,
+      stage: 0,
+      lastFlip: null,
+      winner: null,
+      prize: 0,
+      awarded: true,
+      players: {}
+    };
+    initial.players[deviceId] = { name: me.name, bet: 0, side: null, out: false };
+    await db.set(["rooms", code], initial);
+    enterRoom(code);
+  }
+
+  async function joinRoom(rawCode) {
+    if (!me) return;
+    var code = String(rawCode || "").trim().toUpperCase();
+    if (!/^[A-Z0-9]{3,8}$/.test(code)) { toast("Код из 3–8 букв или цифр", true); return; }
+    var room = await db.get(["rooms", code]);
+    if (!room) { toast("Комната не найдена", true); return; }
+    var res = await db.transact(["rooms", code], function (s) {
+      if (!s) return ABORT;
+      s.players = s.players || {};
+      if (!s.players[deviceId]) {
+        s.players[deviceId] = { name: me.name, bet: 0, side: null, out: false };
+      } else {
+        s.players[deviceId].name = me.name;
+      }
+      return s;
+    });
+    if (!res.ok) { toast("Не удалось войти", true); return; }
+    enterRoom(code);
+  }
+
+  function enterRoom(code) {
+    roomCode = String(code).toUpperCase();
+    setHashRoom(roomCode);
+    showOnly("#screen-room");
+    document.title = "Монетка · " + roomCode;
+    var rc = $("#room-code");
+    if (rc) rc.textContent = roomCode;
+    updateWallet();
+    lastStageSeen = -1;
+    pendingSide = "H";
+    betDraft = "";
+    if (unsubRoom) unsubRoom();
+    state = null;
+    unsubRoom = db.on(["rooms", roomCode], function (v) {
+      state = v;
+      if (!state) {
+        toast("Комната закрыта", true);
+        leaveRoom();
+        return;
+      }
+      render();
+    }, function (err) {
+      console.warn(err);
+      toast("Нет связи с базой", true);
+    });
+    db.get(["rooms", roomCode]).then(function (v) {
+      if (v) { state = v; render(); }
+    });
+  }
+
+  function leaveRoom() {
+    if (unsubRoom) { unsubRoom(); unsubRoom = null; }
+    roomCode = null; state = null;
+    try { history.replaceState(null, "", "#"); } catch (e) {}
+    showLobby();
+  }
+
+  /* ---------------- game actions ---------------- */
+  async function placeBet(amount, side) {
+    if (!state || state.phase !== "betting") { toast("Ставки закрыты", true); return; }
+    var mine = myEntry();
+    if (mine && mine.bet > 0) { toast("Ставка уже сделана", true); return; }
+    amount = Math.floor(Number(amount));
+    if (!amount || amount < 1) { toast("Введите сумму ставки", true); return; }
+    if (!me) return;
+    if (mine && mine.bet > 0) return;
+    if (amount > me.balance) { toast("Недостаточно монет", true); return; }
+    if (side !== "H" && side !== "T") side = "H";
+
+    var deducted = await db.transact(["players", deviceId, "balance"], function (b) {
+      var bal = Number(b) || 0;
+      if (bal < amount) return ABORT;
+      return bal - amount;
+    });
+    if (!deducted.ok) { toast("Недостаточно монет", true); return; }
+    me.balance = Number(deducted.value) || 0;
+    updateWallet();
+
+    var placed = await db.transact(["rooms", roomCode], function (s) {
+      if (!s || s.phase !== "betting") return ABORT;
+      s.players = s.players || {};
+      var p = s.players[deviceId] || { name: me.name };
+      if (Number(p.bet) > 0) return ABORT;
+      p.name = me.name; p.bet = amount; p.side = side; p.out = false;
+      s.players[deviceId] = p;
+      s.pot = (Number(s.pot) || 0) + amount;
+      return s;
+    });
+
+    if (!placed.ok) {
+      await db.transact(["players", deviceId, "balance"], function (b) {
+        return (Number(b) || 0) + amount;
+      });
+      me.balance += amount;
+      updateWallet();
+      toast("Раунд уже стартовал", true);
+      return;
+    }
+    betDraft = "";
+    render();
+  }
+
+  async function pickSide(side) {
+    if (!state || state.phase !== "pick") return;
+    await db.transact(["rooms", roomCode], function (s) {
+      if (!s || s.phase !== "pick") return ABORT;
+      var p = s.players && s.players[deviceId];
+      if (!p || p.out || !(Number(p.bet) > 0)) return ABORT;
+      p.side = side;
+      var alive = Object.keys(s.players).filter(function (k) {
+        var q = s.players[k];
+        return q && Number(q.bet) > 0 && !q.out;
+      });
+      var allPicked = alive.every(function (k) { return !!s.players[k].side; });
+      if (allPicked && alive.length >= 2) s.phase = "flipping";
+      return s;
+    });
+    render();
+  }
+
+  function flipMutation(s) {
+    if (!s) return ABORT;
+    if (s.phase !== "betting" && s.phase !== "flipping") return ABORT;
+
+    var keys = Object.keys(s.players || {});
+    var alive = keys.filter(function (k) {
+      var p = s.players[k];
+      return p && Number(p.bet) > 0 && !p.out;
+    });
+    var ready = alive.filter(function (k) { return !!s.players[k].side; });
+    if (ready.length < 2) return ABORT;
+
+    // кто не поставил — вне раунда
+    keys.forEach(function (k) {
+      var p = s.players[k];
+      if (p && !(Number(p.bet) > 0)) p.out = true;
+    });
+
+    var result = Math.random() < 0.5 ? "H" : "T";
+    var survivors = [];
+    alive.forEach(function (k) {
+      var p = s.players[k];
+      if (p.side === result) survivors.push(k);
+      else p.out = true;
+    });
+    survivors.forEach(function (k) { s.players[k].side = null; });
+
+    s.stage = (Number(s.stage) || 0) + 1;
+    s.lastFlip = { result: result, at: Date.now(), stage: s.stage };
+
+    if (survivors.length === 1) {
+      s.winner = survivors[0];
+      s.prize = Number(s.pot) || 0;
+      s.winSide = result;
+      s.phase = "result";
+      s.awarded = false;
+    } else {
+      s.phase = "pick";
+    }
+    return s;
+  }
+
+  async function doFlip() {
+    if (!state) return;
+    if (state.phase !== "betting" && state.phase !== "flipping") return;
+    var res = await db.transact(["rooms", roomCode], flipMutation);
+    if (!res.ok) {
+      if (state.phase === "betting") toast("Нужно минимум 2 участника со ставкой", true);
+    }
+    render();
+  }
+
+  function newRoundMutation(s) {
+    if (!s || s.phase !== "result") return ABORT;
+    s.round = (Number(s.round) || 1) + 1;
+    s.phase = "betting";
+    s.pot = 0;
+    s.stage = 0;
+    s.lastFlip = null;
+    s.winner = null;
+    s.prize = 0;
+    s.winSide = null;
+    s.awarded = true;
+    Object.keys(s.players || {}).forEach(function (k) {
+      var p = s.players[k];
+      p.bet = 0; p.side = null; p.out = false;
+    });
+    return s;
+  }
+
+  async function startNewRound() {
+    await db.transact(["rooms", roomCode], newRoundMutation);
+    pendingSide = "H";
+    betDraft = "";
+    render();
+  }
+
+  async function settleIfNeeded() {
+    if (!state || state.phase !== "result" || !state.winner || state.awarded) return;
+    if (settleBusy) return;
+    var key = "mtc_claim_" + roomCode + "_" + state.round;
+    try { if (localStorage.getItem(key)) return; } catch (e) {}
+    settleBusy = true;
+    try {
+      var prize = Number(state.prize) || 0;
+      await db.transact(["players", state.winner, "balance"], function (b) {
+        return (Number(b) || 0) + prize;
+      });
+      try { localStorage.setItem(key, "1"); } catch (e) {}
+      await db.transact(["rooms", roomCode], function (s) {
+        if (!s || s.awarded) return ABORT;
+        s.awarded = true;
+        return s;
+      });
+    } catch (e) {
+      console.warn("settle failed", e);
+    } finally {
+      settleBusy = false;
+    }
+  }
+
+  async function topup() {
+    if (!me) return;
+    var res = await db.transact(["players", deviceId, "balance"], function (b) {
+      return (Number(b) || 0) + TOPUP;
+    });
+    if (res.ok) {
+      me.balance = Number(res.value) || me.balance;
+      updateWallet();
+      toast("+" + fmt(TOPUP) + " монет");
+    }
+  }
+
+  function logout() {
+    try { localStorage.removeItem(LS_DEVICE); } catch (e) {}
+    me = null;
+    if (unsubBalance) { unsubBalance(); unsubBalance = null; }
+    if (unsubRoom) { unsubRoom(); unsubRoom = null; }
+    roomCode = null; state = null;
+    showLogin();
+    var f = $("#fio");
+    if (f) f.value = "";
+    toast("Профиль отвязан от устройства");
+  }
+
+  /* ---------------- rendering ---------------- */
+  function render() {
+    if (!state) return;
+    updateWallet();
+
+    var rn = $("#round-num"); if (rn) rn.textContent = state.round || 1;
+
+    renderPlayers();
+    renderStatus();
+    renderActions();
+    renderBetbar();
+    updateCoin();
+    settleIfNeeded();
+  }
+
+  function renderPlayers() {
+    var ul = $("#players-list");
+    var counter = $("#players-count");
+    if (!ul) return;
+    var list = playersList().slice().sort(function (a, b) {
+      if (a.out !== b.out) return a.out ? 1 : -1;
+      return b.bet - a.bet;
+    });
+    if (counter) counter.textContent = String(list.filter(function (p) { return p.bet > 0; }).length);
+    if (!list.length) {
+      ul.innerHTML = '<li class="empty-players">Пока никого. Позовите друзей по коду комнаты.</li>';
+      return;
+    }
+    var html = "";
+    list.forEach(function (p) {
+      var statusTag = "ждёт ставку";
+      var tagClass = "";
+      if (p.bet > 0) {
+        if (state.phase === "result" && state.winner === p.key) { statusTag = "победитель"; tagClass = "win"; }
+        else if (p.out) { statusTag = "выбыл"; tagClass = "out"; }
+        else statusTag = "в игре";
+      }
+      var cls = "pl" + (p.me ? " me" : "") + (p.out ? " out" : "") + (state.phase === "result" && state.winner === p.key ? " won" : "");
+      var initials = p.name.trim().split(/\s+/).map(function (w) { return w.charAt(0); }).slice(0, 2).join("");
+      var shownSide = p.side;
+      if (state.phase === "result" && state.winner === p.key && state.winSide) shownSide = state.winSide;
+      html += '<li class="' + cls + '">' +
+        '<span class="av">' + escapeHtml(initials || "?") + '</span>' +
+        '<span class="nm"><b>' + escapeHtml(p.name) + '</b><small>' + (p.bet > 0 ? sideName(shownSide) : "—") + '</small></span>' +
+        '<span class="st"><span class="amount">' + (p.bet > 0 ? fmt(p.bet) : "—") + '</span>' +
+        '<span class="tag ' + tagClass + '">' + statusTag + '</span></span></li>';
+    });
+    ul.innerHTML = html;
+  }
+
+  function renderStatus() {
+    var st = $("#flip-status"), hint = $("#room-hint");
+    if (!st) return;
+    var phase = state.phase;
+    var ready = readyList().length;
+    var alive = aliveList().length;
+    var inRound = participating().length;
+    st.classList.remove("win");
+    hint.textContent = "";
+
+    if (phase === "betting") {
+      st.textContent = "Ставки открыты";
+      hint.textContent = inRound === 0
+        ? "Сделайте первую ставку снизу."
+        : "Участников: " + inRound + " · готовы: " + ready + (ready < 2 ? " · нужно минимум 2" : " · можно кидать монету");
+    } else if (phase === "pick") {
+      st.textContent = "Тай-брейк — победители выбирают сторону";
+      hint.textContent = "В игре: " + alive + " · выбрали: " + readyList().length;
+    } else if (phase === "flipping") {
+      st.textContent = "Все готовы. Кидаем монету.";
+      hint.textContent = "В игре: " + alive;
+    } else if (phase === "result") {
+      var w = state.winner && state.players ? state.players[state.winner] : null;
+      st.classList.add("win");
+      st.innerHTML = 'Победитель — <span class="win">' + escapeHtml(w ? w.name : "—") + '</span>. Забирает ставки всех: ' + fmt(state.prize || 0) + ' монет';
+      hint.textContent = "Начинайте новый раунд, когда готовы.";
+    }
+
+    var hist = state.lastFlip ? state.lastFlip : null;
+    var pip = $("#coin-history");
+    if (!pip) {
+      // create history row once inside stage actions container? simple: skip extra
+    }
+    void hist;
+  }
+
+  function renderActions() {
+    var box = $("#room-actions");
+    if (!box) return;
+    var phase = state.phase;
+    var html = "";
+    if (phase === "betting" && readyList().length >= 2) {
+      html = '<button class="btn primary" data-act="flip">Кинуть монету</button>';
+    } else if (phase === "flipping") {
+      html = '<button class="btn primary" data-act="flip">Кинуть монету</button>';
+    } else if (phase === "result") {
+      html = '<button class="btn green" data-act="new-round">Новый раунд</button>';
+    }
+    if (box.innerHTML !== html) box.innerHTML = html;
+  }
+
+  function renderBetbar() {
+    var bar = $("#betbar");
+    if (!bar) return;
+    var phase = state.phase;
+    var mine = myEntry();
+    var hasBet = mine && Number(mine.bet) > 0;
+    var alive = aliveList().length;
+
+    if (phase === "betting" && !hasBet) {
+      var html = '<div class="bet-head"><strong>Ваша ставка</strong>' +
+        '<span class="muted">Баланс: <b>' + fmt(me ? me.balance : 0) + '</b> монет</span></div>' +
+        '<div class="bet-form">' +
+        '<div><label for="bet-amount">Сумма</label>' +
+        '<input id="bet-amount" type="number" min="1" step="10" inputmode="numeric" placeholder="0" aria-label="Сумма ставки" value="' + escapeAttr(betDraft) + '"></div>' +
+        '<div><label>Сторона</label><div class="side-pick">' +
+        '<button class="side" type="button" data-side="H" aria-pressed="' + (pendingSide === "H") + '">Орёл</button>' +
+        '<button class="side" type="button" data-side="T" aria-pressed="' + (pendingSide === "T") + '">Решка</button>' +
+        '</div></div>' +
+        '<button class="btn primary" type="button" data-act="place-bet">Сделать ставку</button>' +
+        '</div>' +
+        '<div class="quick">' +
+        '<button type="button" data-amt="10">10</button>' +
+        '<button type="button" data-amt="50">50</button>' +
+        '<button type="button" data-amt="100">100</button>' +
+        '<button type="button" data-amt="250">250</button>' +
+        '<button type="button" data-amt="all">всё</button>' +
+        '</div>';
+      if (bar.dataset.sig !== "bet-" + pendingSide + "-" + (me ? me.balance : 0)) {
+        bar.innerHTML = html;
+        bar.dataset.sig = "bet-" + pendingSide + "-" + (me ? me.balance : 0);
+      }
+      return;
+    }
+
+    // после ставки — панель участников и ставки
+    var entrants = participating();
+    var chips = entrants.length
+      ? entrants.map(function (p) {
+        var cls = "chip" + (p.me ? " me" : "") + (p.out ? " out" : "") + (p.side ? (p.side === "H" ? " h" : " t") : "");
+        return '<span class="' + cls + '"><span class="dot"></span>' + escapeHtml(p.name.split(" ")[0]) +
+          ' <b>' + fmt(p.bet) + '</b>' + (p.side ? ' · ' + sideName(p.side) : '') + '</span>';
+      }).join("")
+      : '<span class="bet-note">Ставок пока нет.</span>';
+
+    var myShownSide = mine ? mine.side : null;
+    if (state.phase === "result" && state.winner === deviceId && state.winSide) myShownSide = state.winSide;
+    var head = hasBet
+      ? '<strong>Вы в игре: ' + fmt(mine.bet) + ' · ' + sideName(myShownSide) + '</strong>'
+      : '<strong>Участники раунда</strong>';
+
+    var controls = "";
+    if (phase === "pick") {
+      if (mine && !mine.out && Number(mine.bet) > 0 && !mine.side) {
+        controls = '<div class="bet-actions"><span class="bet-note">Выберите сторону для тай-брейка:</span>' +
+          '<button class="btn" type="button" data-pick="H">Орёл</button>' +
+          '<button class="btn" type="button" data-pick="T">Решка</button></div>';
+      } else if (mine && !mine.out) {
+        controls = '<div class="bet-actions"><span class="bet-note">Ждём выбор остальных (' + readyList().length + '/' + alive + ').</span></div>';
+      } else {
+        controls = '<div class="bet-actions"><span class="bet-note">Вы выбыли в этом раунде — смотрите за тай-брейком.</span></div>';
+      }
+    } else if (phase === "result") {
+      var w = state.winner && state.players ? state.players[state.winner] : null;
+      var isWinner = state.winner === deviceId;
+      controls = '<div class="bet-actions">' +
+        '<div class="winner-banner" style="flex:1"><span class="cup">🏆</span><span>' +
+        (isWinner ? "Вы забрали ставки — " : escapeHtml(w ? w.name : "—") + " забирает ставки — ") +
+        '<b>' + fmt(state.prize || 0) + '</b> монет</span></div>' +
+        '<button class="btn green" type="button" data-act="new-round">Новый раунд</button></div>';
+    } else if (phase === "flipping") {
+      controls = '<div class="bet-actions"><span class="bet-note">Все выбрали сторону — можно кидать монету.</span>' +
+        (alive >= 2 ? '<button class="btn primary" type="button" data-act="flip">Кинуть монету</button>' : '') + '</div>';
+    } else {
+      controls = '<div class="bet-actions"><span class="bet-note">Ставки в этом раунде закрыты. Ждём подброс.</span></div>';
+    }
+
+    var fullHtml = '<div class="bet-head">' + head +
+      '<span class="muted">Баланс: <b>' + fmt(me ? me.balance : 0) + '</b> монет</span></div>' +
+      '<div class="bet-participants">' + chips + '</div>' + controls;
+
+    var sig = "part-" + phase + "-" + (mine ? (mine.bet + ":" + mine.side + ":" + mine.out) : "none") +
+      "-" + entrants.map(function (p) { return p.key + p.bet + p.side + p.out; }).join("|") +
+      "-" + (state.winner || "") + "-" + (me ? me.balance : 0) + "-" + alive;
+    if (bar.dataset.sig !== sig) {
+      bar.innerHTML = fullHtml;
+      bar.dataset.sig = sig;
+    }
+  }
+
+  function updateCoin() {
+    var coin = $("#coin"), face = $("#coin-face"), label = $("#coin-label");
+    if (!coin || !face) return;
+    var lf = state && state.lastFlip;
+    if (!lf) {
+      coin.className = "coin idle";
+      coin.dataset.side = "";
+      face.textContent = "?";
+      if (label) label.textContent = "";
+      lastStageSeen = state && state.stage ? state.stage : -1;
+      return;
+    }
+    if (state.stage === lastStageSeen) return;
+    lastStageSeen = state.stage;
+
+    coin.className = "coin spin";
+    coin.dataset.side = "";
+    face.textContent = "?";
+    if (label) label.textContent = "";
+    clearTimeout(spinTimer);
+    spinTimer = setTimeout(function () {
+      // состояние могло смениться
+      var result = lf.result;
+      coin.className = "coin reveal";
+      coin.dataset.side = result;
+      face.textContent = sideGlyph(result);
+      if (label) label.textContent = result === "H" ? "ОРЁЛ" : "РЕШКА";
+    }, 950);
+  }
+
+  function escapeHtml(s) {
+    return String(s == null ? "" : s)
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  }
+  function escapeAttr(s) { return escapeHtml(s).replace(/"/g, "&quot;"); }
+
+  /* ---------------- events ---------------- */
+  document.addEventListener("click", function (e) {
+    var target = e.target.closest ? e.target.closest("[data-act],[data-side],[data-pick],[data-amt]") : null;
+    if (!target) return;
+
+    if (target.hasAttribute("data-side")) {
+      pendingSide = target.getAttribute("data-side");
+      var bar = $("#betbar");
+      if (bar) bar.dataset.sig = "";
+      renderBetbar();
+      return;
+    }
+    if (target.hasAttribute("data-pick")) {
+      var side = target.getAttribute("data-pick");
+      pickSide(side).catch(function () { toast("Не удалось выбрать сторону", true); });
+      return;
+    }
+    if (target.hasAttribute("data-amt")) {
+      var v = target.getAttribute("data-amt");
+      var input = $("#bet-amount");
+      if (!input) return;
+      if (v === "all") input.value = String(Math.max(1, Math.floor(me ? me.balance : 0)));
+      else input.value = v;
+      betDraft = input.value;
+      return;
+    }
+
+    var act = target.getAttribute("data-act");
+    switch (act) {
+      case "create-room": createRoom().catch(function (err) { console.error(err); toast("Ошибка создания комнаты", true); }); break;
+      case "join-room": {
+        var inp = $("#join-code");
+        joinRoom(inp ? inp.value : "").catch(function (err) { console.error(err); toast("Ошибка входа", true); });
+        break;
+      }
+      case "copy-code":
+        if (roomCode) {
+          navigator.clipboard && navigator.clipboard.writeText(roomCode).then(function () {
+            toast("Код скопирован");
+          }, function () { toast("Код: " + roomCode); });
+          if (!navigator.clipboard) toast("Код: " + roomCode);
+        }
+        break;
+      case "place-bet": {
+        var amountInput = $("#bet-amount");
+        var amount = amountInput ? amountInput.value : 0;
+        placeBet(amount, pendingSide).catch(function (err) { console.error(err); toast("Не удалось сделать ставку", true); });
+        break;
+      }
+      case "flip":
+        doFlip().catch(function (err) { console.error(err); toast("Не удалось подбросить монету", true); });
+        break;
+      case "new-round":
+        startNewRound().catch(function (err) { console.error(err); toast("Ошибка", true); });
+        break;
+      case "topup": topup().catch(function () { toast("Не удалось пополнить", true); }); break;
+      case "logout": logout(); break;
+      case "leave-room": leaveRoom(); break;
+    }
+  });
+
+  document.addEventListener("input", function (e) {
+    if (e.target && e.target.id === "bet-amount") {
+      betDraft = e.target.value;
+    }
+  });
+
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Enter" && $("#screen-room") && !$("#screen-room").classList.contains("hidden")) {
+      var focused = document.activeElement;
+      if (focused && focused.id === "bet-amount" && state && state.phase === "betting") {
+        e.preventDefault();
+        var v = focused.value;
+        placeBet(v, pendingSide).catch(function () {});
+      }
+    }
+  });
+
+  // login form
+  var loginForm = $("#login-form");
+  if (loginForm) {
+    loginForm.addEventListener("submit", function (e) {
+      e.preventDefault();
+      var v = $("#fio") ? $("#fio").value : "";
+      login(v).catch(function (err) { console.error(err); toast("Не удалось войти", true); });
+    });
+  }
+
+  var joinCodeInput = $("#join-code");
+  if (joinCodeInput) {
+    joinCodeInput.addEventListener("keydown", function (e) {
+      if (e.key === "Enter") joinRoom(joinCodeInput.value);
+    });
+    joinCodeInput.addEventListener("input", function () {
+      joinCodeInput.value = joinCodeInput.value.toUpperCase().replace(/[^A-Z0-9]/g, "");
+    });
+  }
+
+  window.addEventListener("hashchange", function () {
+    var code = readRoomFromHash();
+    if (code && code !== roomCode) enterRoom(code);
+  });
+
+  /* ---------------- boot ---------------- */
+  (async function boot() {
+    try {
+      await initDB();
+    } catch (e) {
+      console.error(e);
+      db = makeLocalDB();
+      dbKind = "local";
+    }
+    var saved = await ensureMe();
+    if (saved) {
+      me = saved;
+      subscribeBalance();
+      showLobby();
+      var hashRoom = readRoomFromHash();
+      if (hashRoom) {
+        var exists = await db.get(["rooms", hashRoom]);
+        if (exists) enterRoom(hashRoom);
+      }
+    } else {
+      showLogin();
+      var f = $("#fio");
+      if (f) setTimeout(function () { f.focus(); }, 200);
+    }
+    var banner = $("#fb-status");
+    if (banner && dbKind === "local") {
+      banner.classList.remove("hidden");
+      banner.textContent = "Демо-режим: данные хранятся только в этом браузере. Подключите Firebase (файл firebase-config.js), чтобы играть между устройствами.";
+    }
+  })();
+})();
+</script>
+</body>
+</html>

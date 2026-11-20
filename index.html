@@ -1,148 +1,3 @@
-сделай мини казино на базе даных fire base чисто для моих друзей вход через ведите фио и запоминается устройство и на этом устройстве авто заход в акаунт на сайте есть подброс монетки шансы выйграть 50/50 есть ставка в каждом раунде только 1 победитель если победителей 2 то они снова кидают (только победители) пока не останется 1 победитель также есть ставка и снизу есть панель ставка когда поставил ставку вместо окна ставки появляется окно участвующих и ставка 
-Готово. Приложение собрано и проверено в браузере на двух «устройствах».
-
-Файлы
-
-casino-friends/index.html
- — весь сайт (вход, комнаты, игра)
-casino-friends/firebase-config.js — вставьте сюда конфиг Firebase
-casino-friends/database.rules.json
-, 
-firebase.json
- — правила БД и хостинг
-casino-friends/README.md
- — подключение Firebase и публикация
-casino-friends/dist/casino-friends.html
- — тот же сайт одним файлом
-Что работает
-
-Вход по ФИО, устройство запоминается (localStorage → players/{deviceId}), дальше автовход без пароля.
-Комната по 5-символьному коду; общий банк и баланс (старт 1000).
-Панель ставки снизу: сумма + Орёл/Решка; после ставки она заменяется окном участников со ставками и статусами.
-Подброс 50/50, выбывание не угадавших, повторные подбросы только среди совпавших, пока не останется один. Победитель получает весь банк раунда.
-Проверено: два игрока в двух вкладках — обычный раунд с выплатой, тай-брейк (двое совпали → перевыбор сторон → один победитель), автовход после перезагрузки, 1440 и 390 px без ошибок в консоли.
-
-Сейчас включён демо-режим (данные в браузере). Чтобы играть между устройствами, заполните 
-firebase-config.js
- и опубликуйте правила из 
-database.rules.json
- — пошагово в README. Монеты виртуальные: платежей и реальных ставок в приложении нет.
-
-index.html
-database.rules.json
-firebase.json
-README.md
-casino-friends.html
-https://console.firebase.google.com/project/minigame-b6df4/database/minigame-b6df4-default-rtdb/data/~2F что мне надо загрузить на гитаб?
-На GitHub Pages нужны два файла в корне репозитория (можно добавить третий — README):
-
-index.html
-firebase-config.js
-dist/casino-friends.html
- загружать не нужно — это тот же сайт одним файлом, но с уже вклеенным конфигом. Если хотите один файл, тогда заполните 
-firebase-config.js
-, пересоберите dist и залейте его как 
-index.html
-.
-
-Перед загрузкой
-
-В 
-firebase-config.js
- замените PASTE_* на реальные значения: Firebase Console → ⚙️ Project settings → General → Your apps → Web </> → firebaseConfig. Обязательны apiKey и databaseURL (для вашего проекта обычно https://minigame-b6df4-default-rtdb.<регион>.firebasedatabase.app — скопируйте точную строку из конфига).
-Realtime Database → Rules → вставьте содержимое 
-database.rules.json
- → Publish. Иначе приложение упрётся в permission denied.
-Публикация
-
-Загрузите файлы в репозиторий → Settings → Pages → Source: Deploy from a branch, ветка main, папка 
-(root)
-.
-Сайт будет на https://<логин>.github.io/<репозиторий>/. Ссылку и код комнаты передайте друзьям.
-Два момента: для бесплатного GitHub Pages репозиторий должен быть публичным, а правила БД открытые — значит, адрес базы теоретически доступен всем. Для узкого круга это нормально; если нужна закрытость, лучше Firebase Hosting (в папке уже есть 
-firebase.json
-) или приватный репозиторий на Netlify. Пришлите ваш firebaseConfig — вставлю в файл и пересоберу бандл.
-
-index.html
-database.rules.json
-firebase.json
-// Import the functions you need from the SDKs you need
-import { initializeApp } from "firebase/app";
-import { getAnalytics } from "firebase/analytics";
-// TODO: Add SDKs for Firebase products that you want to use
-// https://firebase.google.com/docs/web/setup#available-libraries
-
-// Your web app's Firebase configuration
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
-const firebaseConfig = {
-  apiKey: "AIzaSyDQS1PMNSYwzGKem0o7VYAz0O-22WoOntg",
-  authDomain: "minigame-b6df4.firebaseapp.com",
-  databaseURL: "https://minigame-b6df4-default-rtdb.firebaseio.com",
-  projectId: "minigame-b6df4",
-  storageBucket: "minigame-b6df4.firebasestorage.app",
-  messagingSenderId: "941035034424",
-  appId: "1:941035034424:web:e9fbf8a93aba58e78053cd",
-  measurementId: "G-SJ3WV80QS7"
-};
-
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const analytics = getAnalytics(app);
-Конфиг вставлен и проверен вживую: приложение подключилось к minigame-b6df4, записало игрока и комнату в Realtime Database (тестовые записи я удалил). Бандл пересобран.
-
-Что залить в репозиторий GitHub (корень, ветка main)
-
-index.html
-firebase-config.js
-README.md          (необязательно)
-.nojekyll          (необязательно, пустой файл)
-dist/casino-friends.html
- заливать не надо, если заливаете два файла выше.
-Альтернатива одним файлом: залить только 
-dist/casino-friends.html
-, переименовав его в 
-index.html
- — конфиг уже внутри, я его пересобрал.
-firebase.json
-, 
-database.rules.json
- — для деплоя через CLI, на Pages не нужны.
-Дальше
-
-Repo → Settings → Pages → Source: Deploy from a branch, main, 
-(root)
-.
-Откройте https://<логин>.github.io/<repo>/ — должна открыться форма входа без жёлтой плашки «Демо-режим» (это и значит, что Firebase подключился).
-Если увидите ошибку permission denied — Realtime Database → Rules → вставьте содержимое 
-database.rules.json
- → Publish.
-Учтите: база сейчас в тестовом режиме (открытые правила), и через 30 дней Firebase заблокирует доступ. Тогда просто опубликуйте правила из 
-database.rules.json
- — они тоже открытые, но без даты истечения. И репозиторий для бесплатного Pages должен быть публичным.
-
-index.html
-firebase.json
-database.rules.json
-зделай без банка просто ставка 
-Убрал «банк» из интерфейса, выплата осталась прежней: ставки списываются у всех, победитель получает их сумму.
-
-Шапка раунда: «Раунд N · шанс 50/50» вместо «Банк 200».
-Итог: «Победитель — Имя. Забирает ставки всех: 200 монет».
-Панель снизу: «Вы забрали ставки — 200 монет».
-Лобби и README поправлены, 
-dist/casino-friends.html
- пересобран.
-Проверил на живом Firebase: ставка, запись в базу, ошибок в консоли нет; тестовые записи удалил. На GitHub заливаете те же 
-index.html
- + 
-firebase-config.js
- (либо обновлённый 
-dist/casino-friends.html
- как 
-index.html
-).
-
-index.html
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -474,48 +329,10 @@ index.html
       <button class="btn primary" type="submit">Войти</button>
     </form>
     <div class="device-note">
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="2" width="16" height="20" rx="3"/><path d="M11 18h2"/></svg>
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="2" width="16" height="20" rx="3" /><path d="M11 18h2" /></svg>
       <span>Устройство запомнится: при следующем заходе вы попадёте в аккаунт автоматически, без ввода имени.</span>
     </div>
     <div id="fb-status" class="demo-banner hidden"></div>
-  </div>
-</section>
-
-<!-- ======== LOBBY ======== -->
-<section id="screen-lobby" class="screen hidden">
-  <header class="topbar">
-    <div class="brand">МОНЕТКА<small>для своих</small></div>
-    <div class="spacer"></div>
-    <div class="wallet">
-      <span class="who" id="lobby-name"></span>
-      <span class="bal" id="lobby-balance">0</span>
-      <button class="btn ghost" data-act="topup">пополнить</button>
-      <button class="btn ghost" data-act="logout">сменить профиль</button>
-    </div>
-  </header>
-  <div class="lobby-main">
-    <h2>Стол накрыт</h2>
-    <p class="sub">Создайте комнату и скиньте код друзьям — или вступите в уже открытую.</p>
-    <div class="lobby-grid">
-      <div class="panel">
-        <h3>Создать комнату</h3>
-        <p>Вы станете хозяином стола. Код появится сразу — его нужно передать друзьям.</p>
-        <button class="btn primary" data-act="create-room">Создать комнату</button>
-      </div>
-      <div class="panel">
-        <h3>Войти по коду</h3>
-        <p>Введите код, который прислал друг.</p>
-        <div class="join-row">
-          <input id="join-code" type="text" placeholder="КОД" maxlength="8" autocomplete="off" spellcheck="false" aria-label="Код комнаты">
-          <button class="btn green" data-act="join-room">Войти</button>
-        </div>
-      </div>
-    </div>
-    <div class="features">
-      <div class="feature"><b>50/50</b><span>Орёл или решка — каждый выбирает сторону до подброса.</span></div>
-      <div class="feature"><b>Один победитель</b><span>Совпавшие продолжают, остальные выбывают. Пока не останется один.</span></div>
-      <div class="feature"><b>Ставки</b><span>Каждый ставит перед подбросом, победитель забирает ставки всех.</span></div>
-    </div>
   </div>
 </section>
 
@@ -523,13 +340,13 @@ index.html
 <section id="screen-room" class="screen hidden">
   <header class="topbar">
     <div class="brand">МОНЕТКА<small>для своих</small></div>
-    <div class="room-code">Комната <b id="room-code">—</b><button class="btn ghost" data-act="copy-code">код</button></div>
+    <div class="room-code">Общий стол</div>
     <div class="spacer"></div>
     <div class="wallet">
       <span class="who" id="room-name"></span>
       <span class="bal" id="room-balance">0</span>
       <button class="btn ghost" data-act="topup">+500</button>
-      <button class="btn ghost" data-act="leave-room">выйти</button>
+      <button class="btn ghost" data-act="logout">сменить профиль</button>
     </div>
   </header>
 
@@ -560,7 +377,20 @@ index.html
 
 <div class="toast-wrap" id="toasts"></div>
 
-<script src="firebase-config.js"></script>
+<script>/* MultiTool · Монетка — конфиг Firebase.
+ * Проект: minigame-b6df4. Ключ apiKey не секретный — он по определению
+ * попадает в клиентский код, доступ к данным регулируют правила Realtime Database.
+ */
+window.FIREBASE_CONFIG = {
+  apiKey: "AIzaSyDQS1PMNSYwzGKem0o7VYAz0O-22WoOntg",
+  authDomain: "minigame-b6df4.firebaseapp.com",
+  databaseURL: "https://minigame-b6df4-default-rtdb.firebaseio.com",
+  projectId: "minigame-b6df4",
+  storageBucket: "minigame-b6df4.firebasestorage.app",
+  messagingSenderId: "941035034424",
+  appId: "1:941035034424:web:e9fbf8a93aba58e78053cd"
+};
+</script>
 <script>
 (function () {
   "use strict";
@@ -851,9 +681,7 @@ index.html
     await db.set(["players", deviceId], rec);
     me = { name: name, balance: Number(rec.balance) || 0 };
     subscribeBalance();
-    showLobby();
-    var hashRoom = readRoomFromHash();
-    if (hashRoom) enterRoom(hashRoom);
+    await enterSingleRoom();
   }
 
   function subscribeBalance() {
@@ -879,19 +707,23 @@ index.html
     });
   }
 
+  async function refreshBalance() {
+    try {
+      var b = await db.get(["players", deviceId, "balance"]);
+      if (typeof b === "number") {
+        me.balance = b;
+        updateWallet();
+        renderBetbar();
+      }
+    } catch (e) {}
+  }
+
   /* ---------------- navigation ---------------- */
   function showOnly(id) {
-    ["#screen-login", "#screen-lobby", "#screen-room"].forEach(function (sel) {
+    ["#screen-login", "#screen-room"].forEach(function (sel) {
       var el = $(sel);
       if (el) el.classList.toggle("hidden", sel !== id);
     });
-  }
-  function showLobby() {
-    showOnly("#screen-lobby");
-    updateWallet();
-    var el = $("#fb-status");
-    if (el) el.classList.add("hidden");
-    document.title = "Монетка — лобби";
   }
   function showLogin() {
     showOnly("#screen-login");
@@ -903,63 +735,43 @@ index.html
     }
   }
 
-  function readRoomFromHash() {
-    var m = /(?:^|[#&/])room=([A-Z0-9]{3,8})/i.exec(location.hash || "");
-    return m ? m[1].toUpperCase() : null;
-  }
-  function setHashRoom(code) {
-    try { history.replaceState(null, "", "#room=" + code); } catch (e) { location.hash = "room=" + code; }
-  }
+  /* ---------------- room lifecycle ----------------
+   * Комната одна на всех: код не нужен, вход сразу в общий стол.
+   */
+  var ROOM_ID = "MAIN";
 
-  /* ---------------- room lifecycle ---------------- */
-  async function createRoom() {
+  async function enterSingleRoom() {
     if (!me) return;
-    var code = genCode();
-    var initial = {
-      host: deviceId,
-      created: Date.now(),
-      round: 1,
-      phase: "betting",
-      pot: 0,
-      stage: 0,
-      lastFlip: null,
-      winner: null,
-      prize: 0,
-      awarded: true,
-      players: {}
-    };
-    initial.players[deviceId] = { name: me.name, bet: 0, side: null, out: false };
-    await db.set(["rooms", code], initial);
-    enterRoom(code);
-  }
-
-  async function joinRoom(rawCode) {
-    if (!me) return;
-    var code = String(rawCode || "").trim().toUpperCase();
-    if (!/^[A-Z0-9]{3,8}$/.test(code)) { toast("Код из 3–8 букв или цифр", true); return; }
-    var room = await db.get(["rooms", code]);
-    if (!room) { toast("Комната не найдена", true); return; }
-    var res = await db.transact(["rooms", code], function (s) {
-      if (!s) return ABORT;
-      s.players = s.players || {};
-      if (!s.players[deviceId]) {
-        s.players[deviceId] = { name: me.name, bet: 0, side: null, out: false };
-      } else {
-        s.players[deviceId].name = me.name;
+    await db.transact(["rooms", ROOM_ID], function (s) {
+      if (!s) {
+        s = {
+          host: deviceId,
+          created: Date.now(),
+          round: 1,
+          phase: "betting",
+          pot: 0,
+          stage: 0,
+          lastFlip: null,
+          winner: null,
+          prize: 0,
+          awarded: true,
+          players: {}
+        };
       }
+      s.players = s.players || {};
+      var p = s.players[deviceId];
+      if (!p) p = { name: me.name, bet: 0, side: null, out: false };
+      p.name = me.name;
+      s.players[deviceId] = p;
       return s;
     });
-    if (!res.ok) { toast("Не удалось войти", true); return; }
-    enterRoom(code);
+    enterRoom(ROOM_ID);
   }
 
   function enterRoom(code) {
     roomCode = String(code).toUpperCase();
-    setHashRoom(roomCode);
     showOnly("#screen-room");
-    document.title = "Монетка · " + roomCode;
-    var rc = $("#room-code");
-    if (rc) rc.textContent = roomCode;
+    document.title = "Монетка — общий стол";
     updateWallet();
     lastStageSeen = -1;
     pendingSide = "H";
@@ -986,8 +798,8 @@ index.html
   function leaveRoom() {
     if (unsubRoom) { unsubRoom(); unsubRoom = null; }
     roomCode = null; state = null;
-    try { history.replaceState(null, "", "#"); } catch (e) {}
-    showLobby();
+    if (me) enterSingleRoom();
+    else showLogin();
   }
 
   /* ---------------- game actions ---------------- */
@@ -1032,6 +844,7 @@ index.html
       return;
     }
     betDraft = "";
+    await refreshBalance();
     render();
   }
 
@@ -1133,20 +946,29 @@ index.html
   async function settleIfNeeded() {
     if (!state || state.phase !== "result" || !state.winner || state.awarded) return;
     if (settleBusy) return;
-    var key = "mtc_claim_" + roomCode + "_" + state.round;
-    try { if (localStorage.getItem(key)) return; } catch (e) {}
     settleBusy = true;
+    var winner = state.winner;
+    var prize = Number(state.prize) || 0;
     try {
-      var prize = Number(state.prize) || 0;
-      await db.transact(["players", state.winner, "balance"], function (b) {
-        return (Number(b) || 0) + prize;
-      });
-      try { localStorage.setItem(key, "1"); } catch (e) {}
-      await db.transact(["rooms", roomCode], function (s) {
-        if (!s || s.awarded) return ABORT;
+      // Выплату забирает ровно один клиент: атомарно закрываем раунд.
+      var claim = await db.transact(["rooms", roomCode], function (s) {
+        if (!s || s.phase !== "result" || s.awarded || !s.winner) return ABORT;
         s.awarded = true;
         return s;
       });
+      if (!claim.ok) return;
+      var credit = await db.transact(["players", winner, "balance"], function (b) {
+        return (Number(b) || 0) + prize;
+      });
+      if (!credit.ok) {
+        // начислить не удалось — разрешаем повтор
+        await db.transact(["rooms", roomCode], function (s) {
+          if (!s || s.phase !== "result" || !s.awarded) return ABORT;
+          s.awarded = false;
+          return s;
+        });
+      }
+      await refreshBalance();
     } catch (e) {
       console.warn("settle failed", e);
     } finally {
@@ -1162,6 +984,7 @@ index.html
     if (res.ok) {
       me.balance = Number(res.value) || me.balance;
       updateWallet();
+      refreshBalance();
       toast("+" + fmt(TOPUP) + " монет");
     }
   }
@@ -1318,7 +1141,7 @@ index.html
     var chips = entrants.length
       ? entrants.map(function (p) {
         var cls = "chip" + (p.me ? " me" : "") + (p.out ? " out" : "") + (p.side ? (p.side === "H" ? " h" : " t") : "");
-        return '<span class="' + cls + '"><span class="dot"></span>' + escapeHtml(p.name.split(" ")[0]) +
+        return '<span class="' + cls + '"><span class="dot"></span>' + escapeHtml(p.name) +
           ' <b>' + fmt(p.bet) + '</b>' + (p.side ? ' · ' + sideName(p.side) : '') + '</span>';
       }).join("")
       : '<span class="bet-note">Ставок пока нет.</span>';
@@ -1434,20 +1257,6 @@ index.html
 
     var act = target.getAttribute("data-act");
     switch (act) {
-      case "create-room": createRoom().catch(function (err) { console.error(err); toast("Ошибка создания комнаты", true); }); break;
-      case "join-room": {
-        var inp = $("#join-code");
-        joinRoom(inp ? inp.value : "").catch(function (err) { console.error(err); toast("Ошибка входа", true); });
-        break;
-      }
-      case "copy-code":
-        if (roomCode) {
-          navigator.clipboard && navigator.clipboard.writeText(roomCode).then(function () {
-            toast("Код скопирован");
-          }, function () { toast("Код: " + roomCode); });
-          if (!navigator.clipboard) toast("Код: " + roomCode);
-        }
-        break;
       case "place-bet": {
         var amountInput = $("#bet-amount");
         var amount = amountInput ? amountInput.value : 0;
@@ -1462,7 +1271,6 @@ index.html
         break;
       case "topup": topup().catch(function () { toast("Не удалось пополнить", true); }); break;
       case "logout": logout(); break;
-      case "leave-room": leaveRoom(); break;
     }
   });
 
@@ -1493,21 +1301,6 @@ index.html
     });
   }
 
-  var joinCodeInput = $("#join-code");
-  if (joinCodeInput) {
-    joinCodeInput.addEventListener("keydown", function (e) {
-      if (e.key === "Enter") joinRoom(joinCodeInput.value);
-    });
-    joinCodeInput.addEventListener("input", function () {
-      joinCodeInput.value = joinCodeInput.value.toUpperCase().replace(/[^A-Z0-9]/g, "");
-    });
-  }
-
-  window.addEventListener("hashchange", function () {
-    var code = readRoomFromHash();
-    if (code && code !== roomCode) enterRoom(code);
-  });
-
   /* ---------------- boot ---------------- */
   (async function boot() {
     try {
@@ -1521,12 +1314,7 @@ index.html
     if (saved) {
       me = saved;
       subscribeBalance();
-      showLobby();
-      var hashRoom = readRoomFromHash();
-      if (hashRoom) {
-        var exists = await db.get(["rooms", hashRoom]);
-        if (exists) enterRoom(hashRoom);
-      }
+      await enterSingleRoom();
     } else {
       showLogin();
       var f = $("#fio");

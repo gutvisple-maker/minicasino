@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
 <meta name="theme-color" content="#0b0f14">
 <title>Монетка — мини-казино для своих</title>
 <style>
@@ -266,6 +266,19 @@
   .chip.out{opacity:.45;text-decoration:line-through}
   .chip .nm{display:inline-block;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:bottom}
   .chip .sep{color:var(--muted)}
+  /* таблица результатов по раундам */
+  .score-empty{font-size:12.5px;color:var(--muted);padding:6px 2px}
+  .score-wrap{max-height:160px;overflow:auto;border:1px solid var(--line);border-radius:12px;background:var(--bg2)}
+  .score{border-collapse:collapse;width:100%;font-size:13px;font-variant-numeric:tabular-nums}
+  .score th,.score td{padding:7px 11px;border-bottom:1px solid var(--line);border-right:1px solid var(--line);white-space:nowrap;text-align:right}
+  .score th{font-size:11px;letter-spacing:.05em;color:var(--muted);font-weight:600;text-transform:uppercase}
+  .score th.who,.score td.who{text-align:left;position:sticky;left:0;background:#111a21;z-index:1;max-width:150px;overflow:hidden;text-overflow:ellipsis}
+  .score tbody tr:last-child td{border-bottom:0}
+  .score th:last-child,.score td:last-child{border-right:0}
+  .score td.plus{color:var(--green);font-weight:700}
+  .score td.minus{color:var(--red);font-weight:700}
+  .score td.bet{color:var(--gold);font-weight:700}
+  .score th.cur{color:var(--gold)}
   .chip.plus{border-color:rgba(46,230,168,.4);background:rgba(46,230,168,.08)}
   .chip.plus b{color:var(--green)}
   .chip.minus{border-color:rgba(255,93,108,.28)}
@@ -322,6 +335,17 @@
     .logo h1{font-size:20px}
     .bet-head strong{font-size:14px}
     .bet-actions .btn{padding:11px 14px}
+    .score{font-size:12px}
+    .score th,.score td{padding:5px 8px}
+    .score th{font-size:10px}
+    .score th.who,.score td.who{max-width:96px}
+    .score-wrap{max-height:128px}
+    .bet-form label{font-size:10px;margin-bottom:4px}
+    .bet-form input{padding:10px 12px}
+    .side{padding:10px 8px;font-size:13px}
+    .bet-head{margin-bottom:7px}
+    .quick{margin-top:6px}
+    .quick button{padding:5px 9px}
   }
   @media (prefers-reduced-motion: reduce){
     .coin.idle{animation:none}
@@ -865,6 +889,23 @@ window.FIREBASE_CONFIG = {
       s.winner = survivors[0];
       s.prize = Number(s.pot) || 0;
       s.winSide = result;
+      // результаты раунда — для таблицы «игрок × раунд»
+      var results = {};
+      Object.keys(s.players || {}).forEach(function (k) {
+        var p = s.players[k];
+        var bet = Number(p.bet) || 0;
+        if (bet > 0) {
+          results[k] = {
+            name: p.name || "Игрок",
+            bet: bet,
+            delta: (k === survivors[0] ? s.prize - bet : -bet)
+          };
+        }
+      });
+      s.rounds = s.rounds || {};
+      s.rounds[String(s.round)] = results;
+      var rkeys = Object.keys(s.rounds).map(Number).sort(function (a, b) { return a - b; });
+      while (rkeys.length > 20) delete s.rounds[String(rkeys.shift())];
       s.phase = "result";
       s.awarded = false;
     } else {
@@ -1040,15 +1081,54 @@ window.FIREBASE_CONFIG = {
     return (n > 0 ? "+" : n < 0 ? "−" : "") + fmt(Math.abs(n));
   }
 
-  function chipHtml(p) {
-    var isResult = state.phase === "result" && p.bet > 0;
-    var d = deltaOf(p);
-    var cls = "chip" + (p.me ? " me" : "") + (isResult ? (d > 0 ? " plus" : " minus") : (p.side ? (p.side === "H" ? " h" : " t") : ""));
-    var money = isResult ? '<b>' + signed(d) + '</b>' : '<b>' + fmt(p.bet) + '</b>';
-    return '<span class="' + cls + '"><span class="dot"></span>' +
-      '<span class="nm">' + escapeHtml(p.name) + '</span>' +
-      (isResult ? " " : ' <span class="sep">—</span> ') + money +
-      (!isResult && p.side ? ' · ' + sideName(p.side) : '') + '</span>';
+  function historyRounds() {
+    return Object.keys(state.rounds || {}).map(Number).sort(function (a, b) { return a - b; });
+  }
+
+  function tablePlayers() {
+    var map = {}, order = [];
+    function add(k, name) {
+      if (!map[k]) { map[k] = { key: k, name: name || "Игрок" }; order.push(k); }
+      else if (name) map[k].name = name;
+    }
+    playersList().forEach(function (p) { add(p.key, p.name); });
+    var rounds = state.rounds || {};
+    Object.keys(rounds).forEach(function (rn) {
+      var res = rounds[rn] || {};
+      Object.keys(res).forEach(function (k) { add(k, res[k] && res[k].name); });
+    });
+    return order.map(function (k) { return map[k]; });
+  }
+
+  function scoreTableHtml() {
+    var players = tablePlayers();
+    var rounds = historyRounds();
+    var cur = Number(state.round) || 1;
+    var inProgress = state.phase !== "result" && rounds.indexOf(cur) === -1 && participating().length > 0;
+    var cols = rounds.slice(-12);
+    if (inProgress) cols.push(cur);
+    if (!cols.length || !players.length) return '<div class="score-empty">Ставок пока нет.</div>';
+
+    var head = '<tr><th class="who">Игрок</th>' + cols.map(function (r) {
+      return '<th' + (r === cur && inProgress ? ' class="cur"' : '') + '>Раунд ' + r + '</th>';
+    }).join('') + '</tr>';
+
+    var body = players.map(function (p) {
+      var cells = cols.map(function (r) {
+        if (r === cur && inProgress) {
+          var e = state.players && state.players[p.key];
+          var bet = e ? Number(e.bet) || 0 : 0;
+          return '<td class="bet">' + (bet > 0 ? fmt(bet) : '—') + '</td>';
+        }
+        var res = state.rounds && state.rounds[String(r)] ? state.rounds[String(r)][p.key] : null;
+        if (!res) return '<td>—</td>';
+        var d = Number(res.delta) || 0;
+        return '<td class="' + (d > 0 ? 'plus' : d < 0 ? 'minus' : '') + '">' + signed(d) + '</td>';
+      }).join('');
+      return '<tr><td class="who">' + escapeHtml(p.name) + '</td>' + cells + '</tr>';
+    }).join('');
+
+    return '<div class="score-wrap"><table class="score"><thead>' + head + '</thead><tbody>' + body + '</tbody></table></div>';
   }
 
   function renderBetbar() {
@@ -1083,11 +1163,8 @@ window.FIREBASE_CONFIG = {
       return;
     }
 
-    // после ставки — панель участников и ставки
+    // после ставки — таблица «игрок × раунд»
     var entrants = participating();
-    var chips = entrants.length
-      ? entrants.map(chipHtml).join("")
-      : '<span class="bet-note">Ставок пока нет.</span>';
 
     var head = "";
     if (phase === "result" && hasBet) {
@@ -1127,7 +1204,7 @@ window.FIREBASE_CONFIG = {
     }
 
     var fullHtml = '<div class="bet-head">' + head + '</div>' +
-      '<div class="bet-participants">' + chips + '</div>' + controls;
+      scoreTableHtml() + controls;
 
     var sig = "part-" + phase + "-" + (mine ? (mine.bet + ":" + mine.side + ":" + mine.out) : "none") +
       "-" + entrants.map(function (p) { return p.key + p.bet + p.side + p.out; }).join("|") +
@@ -1222,6 +1299,16 @@ window.FIREBASE_CONFIG = {
   document.addEventListener("input", function (e) {
     if (e.target && e.target.id === "bet-amount") {
       betDraft = e.target.value;
+    }
+  });
+
+  // на телефоне клавиатура не должна закрывать панель ставки
+  document.addEventListener("focusin", function (e) {
+    if (e.target && e.target.id === "bet-amount") {
+      setTimeout(function () {
+        var bar = $("#betbar");
+        if (bar && bar.scrollIntoView) bar.scrollIntoView({ block: "end", behavior: "smooth" });
+      }, 250);
     }
   });
 

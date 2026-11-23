@@ -20,7 +20,11 @@
  * Доступ идёт через правила Firebase, ключи не требуются.
  */
 import readline from "node:readline";
+import fs from "node:fs";
+import path from "node:path";
 
+const VERSION = 8;
+const RAW_URL = process.env.ADMIN_URL || "https://raw.githubusercontent.com/gutvisple-maker/minicasino/main/admin.mjs";
 const DB = "https://minigame-b6df4-default-rtdb.firebaseio.com";
 const ROOM = process.env.ROOM || "MAIN";
 const ONLINE_TTL = 60000; // мс: отметка присутствия моложе минуты = онлайн
@@ -417,6 +421,26 @@ async function wipe() {
   console.log("Игра перезапущена с чистого листа.");
 }
 
+async function update() {
+  console.log(`Текущая версия: ${VERSION}. Скачиваю последнюю…`);
+  const res = await fetch(RAW_URL, { cache: "no-store" });
+  if (!res.ok) throw new Error(`HTTP ${res.status} на ${RAW_URL}`);
+  const text = await res.text();
+  const m = /const VERSION = (\d+);/.exec(text);
+  if (!text.includes("admin.mjs") || !text.includes("minigame-b6df4") || !m) {
+    throw new Error("В репозитории лежит старый admin.mjs — загрузите новый файл на GitHub один раз, потом update будет работать.");
+  }
+  const remote = Number(m[1]);
+  if (remote < VERSION) throw new Error(`В репозитории версия ${remote}, у вас ${VERSION} — обновление не нужно.`);
+  if (remote === VERSION && text.length === fs.statSync(path.resolve(process.argv[1])).size) {
+    console.log("Уже последняя версия.");
+    return;
+  }
+  const target = path.resolve(process.argv[1]);
+  fs.writeFileSync(target, text);
+  console.log(`admin.mjs обновлён: версия ${remote}, ${text.length} байт. Перезапустите: node admin.mjs`);
+}
+
 function help() {
   console.log("Команды:");
   console.log("  status                — раунд, онлайн, офлайн, баны");
@@ -430,6 +454,7 @@ function help() {
   console.log('  unban "Саша"          — снять бан');
   console.log('  rename "Саша" "Алекс" — переименовать');
   console.log("  wipe                  — удалить всех и перезапустить");
+  console.log("  update                — скачать последнюю версию admin.mjs");
   console.log("");
   console.log("Без команды: node admin.mjs — интерактивный режим, команды по одной строке.");
 }
@@ -451,13 +476,14 @@ function runCommand(cmd, args) {
     case "round": return round();
     case "reset": return reset();
     case "wipe": return wipe();
+    case "update": return update();
     case "clear": return clear(args.join(" "));
     case "ban": return ban(args.join(" "));
     case "unban": return unban(args.join(" "));
     case "rename": return rename(args[0], args[1]);
     case "help": return help();
     default:
-      console.log("Неизвестно. Доступно: status | start | newround | round | reset | clear | ban | unban | rename | wipe");
+      console.log("Неизвестно. Доступно: status | start | newround | round | reset | clear | ban | unban | rename | wipe | update");
       return Promise.resolve();
   }
 }

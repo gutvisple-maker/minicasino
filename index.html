@@ -235,7 +235,7 @@
   .betbar-inner{width:100%;max-width:1160px;margin:0 auto;padding:14px 18px 18px}
   .bet-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-bottom:12px;font-size:13.5px}
   .bet-head strong{font-size:15px}
-  .bet-form{display:grid;grid-template-columns:160px 1fr auto;gap:12px;align-items:end}
+  .bet-form{display:grid;grid-template-columns:160px 1fr;gap:12px;align-items:end}
   .bet-form label{display:block;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
   .bet-form input{
     width:100%;padding:13px 14px;border-radius:12px;background:#0a1116;border:1px solid var(--line);
@@ -519,7 +519,6 @@ window.FIREBASE_CONFIG = {
   var unsubRoom = null;
   var lastStageSeen = -1;
   var spinTimer = null;
-  var pendingSide = "H";
   var betDraft = "";
 
   function myEntry() {
@@ -870,7 +869,6 @@ window.FIREBASE_CONFIG = {
     document.title = "Монетка — общий стол";
     updateWallet();
     lastStageSeen = -1;
-    pendingSide = "H";
     betDraft = "";
     if (unsubRoom) unsubRoom();
     state = null;
@@ -902,7 +900,7 @@ window.FIREBASE_CONFIG = {
   }
 
   /* ---------------- game actions ---------------- */
-  async function placeBet(amount, side) {
+  async function placeBet(amount) {
     if (!state || state.phase !== "betting") { toast("Ставки закрыты", true); return; }
     var mine = myEntry();
     if (mine && mine.bet > 0) { toast("Ставка уже сделана", true); return; }
@@ -910,14 +908,13 @@ window.FIREBASE_CONFIG = {
     if (!amount || amount < 1) { toast("Введите сумму ставки", true); return; }
     if (!me) return;
     if (mine && mine.bet > 0) return;
-    if (side !== "H" && side !== "T") side = "H";
 
     var placed = await db.transact(["rooms", roomCode], function (s) {
       if (!s || s.phase !== "betting") return ABORT;
       s.players = s.players || {};
       var p = s.players[deviceId] || { name: me.name };
       if (Number(p.bet) > 0) return ABORT;
-      p.name = me.name; p.bet = amount; p.side = side; p.out = false;
+      p.name = me.name; p.bet = amount; p.side = null; p.out = false;
       s.players[deviceId] = p;
       s.pot = (Number(s.pot) || 0) + amount;
       return s;
@@ -951,35 +948,16 @@ window.FIREBASE_CONFIG = {
     render();
   }
 
-  async function pickSide(side) {
-    if (!state || state.phase !== "pick") return;
-    await db.transact(["rooms", roomCode], function (s) {
-      if (!s || s.phase !== "pick") return ABORT;
-      var p = s.players && s.players[deviceId];
-      if (!p || p.out || !(Number(p.bet) > 0)) return ABORT;
-      p.side = side;
-      var alive = Object.keys(s.players).filter(function (k) {
-        var q = s.players[k];
-        return q && Number(q.bet) > 0 && !q.out;
-      });
-      var allPicked = alive.every(function (k) { return !!s.players[k].side; });
-      if (allPicked && alive.length >= 2) s.phase = "flipping";
-      return s;
-    });
-    render();
-  }
-
   function flipMutation(s) {
     if (!s) return ABORT;
-    if (s.phase !== "betting" && s.phase !== "flipping") return ABORT;
+    if (s.phase !== "betting" && s.phase !== "flipping" && s.phase !== "pick") return ABORT;
 
     var keys = Object.keys(s.players || {});
     var alive = keys.filter(function (k) {
       var p = s.players[k];
       return p && Number(p.bet) > 0 && !p.out;
     });
-    var ready = alive.filter(function (k) { return !!s.players[k].side; });
-    if (ready.length < 2) return ABORT;
+    if (alive.length < 2) return ABORT;
 
     // кто не поставил — вне раунда
     keys.forEach(function (k) {
@@ -987,22 +965,28 @@ window.FIREBASE_CONFIG = {
       if (p && !(Number(p.bet) > 0)) p.out = true;
     });
 
-    var result = Math.random() < 0.5 ? "H" : "T";
+    // у каждого свой независимый подброс 50/50
     var survivors = [];
+    var missed = [];
     alive.forEach(function (k) {
-      var p = s.players[k];
-      if (p.side === result) survivors.push(k);
-      else p.out = true;
+      if (Math.random() < 0.5) survivors.push(k);
+      else missed.push(k);
     });
+    if (!survivors.length) {
+      // все проиграли — никто не выбывает, кидаем снова
+      survivors = alive.slice();
+    } else {
+      missed.forEach(function (k) { s.players[k].out = true; });
+    }
     survivors.forEach(function (k) { s.players[k].side = null; });
 
     s.stage = (Number(s.stage) || 0) + 1;
-    s.lastFlip = { result: result, at: Date.now(), stage: s.stage };
+    s.lastFlip = { result: Math.random() < 0.5 ? "H" : "T", at: Date.now(), stage: s.stage };
 
     if (survivors.length === 1) {
       s.winner = survivors[0];
       s.prize = Number(s.pot) || 0;
-      s.winSide = result;
+      s.winSide = null;
       // результаты раунда — для таблицы «игрок × раунд»
       var results = {};
       Object.keys(s.players || {}).forEach(function (k) {
@@ -1023,14 +1007,14 @@ window.FIREBASE_CONFIG = {
       s.phase = "result";
       s.awarded = false;
     } else {
-      s.phase = "pick";
+      s.phase = "flipping";
     }
     return s;
   }
 
   async function doFlip() {
     if (!state) return;
-    if (state.phase !== "betting" && state.phase !== "flipping") return;
+    if (state.phase !== "betting" && state.phase !== "flipping" && state.phase !== "pick") return;
     var res = await db.transact(["rooms", roomCode], flipMutation);
     if (!res.ok) {
       if (state.phase === "betting") toast("Нужно минимум 2 участника со ставкой", true);
@@ -1058,7 +1042,6 @@ window.FIREBASE_CONFIG = {
 
   async function startNewRound() {
     await db.transact(["rooms", roomCode], newRoundMutation);
-    pendingSide = "H";
     betDraft = "";
     render();
   }
@@ -1101,8 +1084,6 @@ window.FIREBASE_CONFIG = {
       }
       var cls = "pl" + (p.me ? " me" : "") + (p.out ? " out" : "") + (state.phase === "result" && state.winner === p.key ? " won" : "");
       var initials = p.name.trim().split(/\s+/).map(function (w) { return w.charAt(0); }).slice(0, 2).join("");
-      var shownSide = p.side;
-      if (state.phase === "result" && state.winner === p.key && state.winSide) shownSide = state.winSide;
       var isRes = state.phase === "result" && p.bet > 0;
       var amountClass = "amount";
       var amountText;
@@ -1115,7 +1096,7 @@ window.FIREBASE_CONFIG = {
       }
       html += '<li class="' + cls + '">' +
         '<span class="av">' + escapeHtml(initials || "?") + '</span>' +
-        '<span class="nm"><b>' + escapeHtml(p.name) + '</b><small>' + (p.bet > 0 ? sideName(shownSide) : "—") + '</small></span>' +
+        '<span class="nm"><b>' + escapeHtml(p.name) + '</b><small>' + (p.bet > 0 ? "ставка" : "—") + '</small></span>' +
         '<span class="st"><span class="' + amountClass + '">' + amountText + '</span>' +
         '<span class="tag ' + tagClass + '">' + statusTag + '</span></span></li>';
     });
@@ -1125,8 +1106,7 @@ window.FIREBASE_CONFIG = {
   function renderStatus() {
     var st = $("#flip-status"), hint = $("#room-hint");
     if (!st) return;
-    var phase = state.phase;
-    var ready = readyList().length;
+    var phase = state.phase === "pick" ? "flipping" : state.phase;
     var alive = aliveList().length;
     var inRound = participating().length;
     st.classList.remove("win");
@@ -1136,12 +1116,9 @@ window.FIREBASE_CONFIG = {
       st.textContent = "Ставки открыты";
       hint.textContent = inRound === 0
         ? "Сделайте первую ставку снизу."
-        : "Участников: " + inRound + " · готовы: " + ready + (ready < 2 ? " · нужно минимум 2" : " · можно кидать монету");
-    } else if (phase === "pick") {
-      st.textContent = "Тай-брейк — победители выбирают сторону";
-      hint.textContent = "В игре: " + alive + " · выбрали: " + readyList().length;
+        : "Участников: " + inRound + (inRound < 2 ? " · нужно минимум 2" : " · можно кидать монету");
     } else if (phase === "flipping") {
-      st.textContent = "Все готовы. Кидаем монету.";
+      st.textContent = "Кидаем монету";
       hint.textContent = "В игре: " + alive;
     } else if (phase === "result") {
       var w = state.winner && state.players ? state.players[state.winner] : null;
@@ -1161,9 +1138,9 @@ window.FIREBASE_CONFIG = {
   function renderActions() {
     var box = $("#room-actions");
     if (!box) return;
-    var phase = state.phase;
+    var phase = state.phase === "pick" ? "flipping" : state.phase;
     var html = "";
-    if (phase === "betting" && readyList().length >= 2) {
+    if (phase === "betting" && participating().length >= 2) {
       html = '<button class="btn primary" data-act="flip">Кинуть монету</button>';
     } else if (phase === "flipping") {
       html = '<button class="btn primary" data-act="flip">Кинуть монету</button>';
@@ -1240,7 +1217,7 @@ window.FIREBASE_CONFIG = {
   function renderBetbar() {
     var bar = $("#betbar");
     if (!bar) return;
-    var phase = state.phase;
+    var phase = state.phase === "pick" ? "flipping" : state.phase;
     var mine = myEntry();
     var hasBet = mine && Number(mine.bet) > 0;
     var alive = aliveList().length;
@@ -1250,10 +1227,6 @@ window.FIREBASE_CONFIG = {
         '<div class="bet-form">' +
         '<div><label for="bet-amount">Сумма</label>' +
         '<input id="bet-amount" type="number" min="1" step="10" inputmode="numeric" placeholder="0" aria-label="Сумма ставки" value="' + escapeAttr(betDraft) + '"></div>' +
-        '<div><label>Сторона</label><div class="side-pick">' +
-        '<button class="side" type="button" data-side="H" aria-pressed="' + (pendingSide === "H") + '">Орёл</button>' +
-        '<button class="side" type="button" data-side="T" aria-pressed="' + (pendingSide === "T") + '">Решка</button>' +
-        '</div></div>' +
         '<button class="btn primary" type="button" data-act="place-bet">Сделать ставку</button>' +
         '</div>' +
         '<div class="quick">' +
@@ -1262,9 +1235,9 @@ window.FIREBASE_CONFIG = {
         '<button type="button" data-amt="100">100</button>' +
         '<button type="button" data-amt="250">250</button>' +
         '</div>';
-      if (bar.dataset.sig !== "bet-" + pendingSide) {
+      if (bar.dataset.sig !== "bet-form") {
         bar.innerHTML = html;
-        bar.dataset.sig = "bet-" + pendingSide;
+        bar.dataset.sig = "bet-form";
       }
       return;
     }
@@ -1278,32 +1251,20 @@ window.FIREBASE_CONFIG = {
       head = '<strong class="' + (d > 0 ? "plus" : "minus") + '">' +
         (d > 0 ? "Вы выиграли " : "Вы проиграли ") + signed(d) + '</strong>';
     } else if (hasBet) {
-      var myShownSide = mine.side;
-      if (phase === "result" && state.winner === deviceId && state.winSide) myShownSide = state.winSide;
-      head = '<strong>Вы в игре: ' + fmt(mine.bet) + ' · ' + sideName(myShownSide) + '</strong>';
+      head = '<strong>Вы в игре: ' + fmt(mine.bet) + '</strong>';
     } else {
       head = '<strong>Участники раунда</strong>';
     }
 
     var controls = "";
-    if (phase === "pick") {
-      if (mine && !mine.out && Number(mine.bet) > 0 && !mine.side) {
-        controls = '<div class="bet-actions"><span class="bet-note">Выберите сторону для тай-брейка:</span>' +
-          '<button class="btn" type="button" data-pick="H">Орёл</button>' +
-          '<button class="btn" type="button" data-pick="T">Решка</button></div>';
-      } else if (mine && !mine.out) {
-        controls = '<div class="bet-actions"><span class="bet-note">Ждём выбор остальных (' + readyList().length + '/' + alive + ').</span></div>';
-      } else {
-        controls = '<div class="bet-actions"><span class="bet-note">Вы выбыли в этом раунде — смотрите за тай-брейком.</span></div>';
-      }
-    } else if (phase === "result") {
+    if (phase === "result") {
       var w = state.winner && state.players ? state.players[state.winner] : null;
       controls = '<div class="bet-actions">' +
         '<div class="winner-banner"><span class="cup">🏆</span><span>' +
         escapeHtml(w ? w.name : "—") + ' забирает ставки всех: <b>' + fmt(state.prize || 0) + '</b></span></div>' +
         '<button class="btn green" type="button" data-act="new-round">Новый раунд</button></div>';
     } else if (phase === "flipping") {
-      controls = '<div class="bet-actions"><span class="bet-note">Все выбрали сторону — можно кидать монету.</span>' +
+      controls = '<div class="bet-actions"><span class="bet-note">Кидаем монету.</span>' +
         (alive >= 2 ? '<button class="btn primary" type="button" data-act="flip">Кинуть монету</button>' : '') + '</div>';
     } else if (phase === "betting") {
       controls = '<div class="bet-actions"><span class="bet-note">Ставка принята — можно отменить до подброса.</span>' +
@@ -1312,11 +1273,10 @@ window.FIREBASE_CONFIG = {
       controls = '<div class="bet-actions"><span class="bet-note">Ставки в этом раунде закрыты. Ждём подброс.</span></div>';
     }
 
-    var fullHtml = '<div class="bet-head">' + head + '</div>' +
-      scoreTableHtml() + controls;
+    var fullHtml = '<div class="bet-head">' + head + '</div>' + scoreTableHtml() + controls;
 
-    var sig = "part-" + phase + "-" + (mine ? (mine.bet + ":" + mine.side + ":" + mine.out) : "none") +
-      "-" + entrants.map(function (p) { return p.key + p.bet + p.side + p.out; }).join("|") +
+    var sig = "part-" + phase + "-" + (mine ? (mine.bet + ":" + mine.out) : "none") +
+      "-" + entrants.map(function (p) { return p.key + p.bet + p.out; }).join("|") +
       "-" + (state.winner || "") + "-" + alive;
     if (bar.dataset.sig !== sig) {
       bar.innerHTML = fullHtml;
@@ -1345,12 +1305,10 @@ window.FIREBASE_CONFIG = {
     if (label) label.textContent = "";
     clearTimeout(spinTimer);
     spinTimer = setTimeout(function () {
-      // состояние могло смениться
-      var result = lf.result;
       coin.className = "coin reveal";
-      coin.dataset.side = result;
-      face.textContent = sideGlyph(result);
-      if (label) label.textContent = result === "H" ? "ОРЁЛ" : "РЕШКА";
+      coin.dataset.side = "";
+      face.textContent = "?";
+      if (label) label.textContent = "";
     }, 950);
   }
 
@@ -1363,21 +1321,9 @@ window.FIREBASE_CONFIG = {
 
   /* ---------------- events ---------------- */
   document.addEventListener("click", function (e) {
-    var target = e.target.closest ? e.target.closest("[data-act],[data-side],[data-pick],[data-amt]") : null;
+    var target = e.target.closest ? e.target.closest("[data-act],[data-amt]") : null;
     if (!target) return;
 
-    if (target.hasAttribute("data-side")) {
-      pendingSide = target.getAttribute("data-side");
-      var bar = $("#betbar");
-      if (bar) bar.dataset.sig = "";
-      renderBetbar();
-      return;
-    }
-    if (target.hasAttribute("data-pick")) {
-      var side = target.getAttribute("data-pick");
-      pickSide(side).catch(function () { toast("Не удалось выбрать сторону", true); });
-      return;
-    }
     if (target.hasAttribute("data-amt")) {
       var v = target.getAttribute("data-amt");
       var input = $("#bet-amount");
@@ -1395,7 +1341,7 @@ window.FIREBASE_CONFIG = {
       case "place-bet": {
         var amountInput = $("#bet-amount");
         var amount = amountInput ? amountInput.value : 0;
-        placeBet(amount, pendingSide).catch(function (err) { console.error(err); toast("Не удалось сделать ставку", true); });
+        placeBet(amount).catch(function (err) { console.error(err); toast("Не удалось сделать ставку", true); });
         break;
       }
       case "flip":
@@ -1429,7 +1375,7 @@ window.FIREBASE_CONFIG = {
       if (focused && focused.id === "bet-amount" && state && state.phase === "betting") {
         e.preventDefault();
         var v = focused.value;
-        placeBet(v, pendingSide).catch(function () {});
+        placeBet(v).catch(function () {});
       }
     }
   });

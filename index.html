@@ -389,7 +389,6 @@
     <div class="spacer"></div>
     <div class="wallet">
       <span class="who" id="room-name"></span>
-      <button class="btn ghost" data-act="logout">сменить профиль</button>
     </div>
   </header>
 
@@ -489,12 +488,11 @@ window.FIREBASE_CONFIG = {
       }
       if (forced) return forced;
     } catch (e) {}
+    // устройство не создаём заранее: нет сохранённого id — значит нужен вход
     try {
-      var v = localStorage.getItem(LS_DEVICE);
-      if (!v) { v = uuid(); localStorage.setItem(LS_DEVICE, v); }
-      return v;
+      return localStorage.getItem(LS_DEVICE) || null;
     } catch (e) {
-      return "mem-" + uuid();
+      return null;
     }
   }
 
@@ -514,13 +512,29 @@ window.FIREBASE_CONFIG = {
   function myEntry() {
     return state && state.players ? state.players[deviceId] : null;
   }
+  // «онлайн» — отметка присутствия моложе 50 секунд (обновляется каждые 15 с)
+  var ONLINE_TTL = 50000;
+  var heartbeatTimer = null;
+
+  function onlineSet() {
+    var p = (state && state.presence) || {};
+    var now = Date.now();
+    var set = {};
+    Object.keys(p).forEach(function (k) {
+      var e = p[k];
+      if (e && now - (Number(e.at) || 0) < ONLINE_TTL) set[k] = true;
+    });
+    return set;
+  }
+
   function playersList() {
     if (!state || !state.players) return [];
+    var on = onlineSet();
     return Object.keys(state.players).map(function (k) {
       var p = state.players[k] || {};
       return {
         key: k, name: p.name || "Игрок", bet: Number(p.bet) || 0,
-        side: p.side || null, out: !!p.out, me: k === deviceId
+        side: p.side || null, out: !!p.out, me: k === deviceId, online: !!on[k]
       };
     });
   }
@@ -631,7 +645,8 @@ window.FIREBASE_CONFIG = {
         writePath(mem, path, deepCopy(val));
         persist();
         return Promise.resolve();
-      }
+      },
+      serverTimestamp: function () { return Date.now(); }
     };
   }
 
@@ -675,7 +690,8 @@ window.FIREBASE_CONFIG = {
           },
           set: function (path, val) {
             return rtdb.ref(path.join("/")).set(val);
-          }
+          },
+          serverTimestamp: function () { return firebase.database.ServerValue.TIMESTAMP; }
         };
         dbKind = "firebase";
         return;
@@ -703,6 +719,10 @@ window.FIREBASE_CONFIG = {
   async function login(name) {
     name = String(name || "").trim().replace(/\s+/g, " ");
     if (name.length < 2) { toast("Введите ФИО", true); return; }
+    if (!deviceId) {
+      deviceId = uuid();
+      try { localStorage.setItem(LS_DEVICE, deviceId); } catch (e) {}
+    }
     var existing = await db.get(["players", deviceId]);
     var rec = existing || {};
     rec.name = name;
@@ -773,6 +793,37 @@ window.FIREBASE_CONFIG = {
     enterRoom(ROOM_ID);
   }
 
+  function beatPresence() {
+    if (!me || !roomCode) return;
+    db.set(["rooms", roomCode, "presence", deviceId], {
+      name: me.name,
+      at: db.serverTimestamp()
+    }).then(function () { render(); }).catch(function () {});
+    // если админ очистил комнату — возвращаемся в список сами
+    db.transact(["rooms", roomCode], function (s) {
+      if (!s) return ABORT;
+      s.players = s.players || {};
+      if (s.players[deviceId]) return ABORT;
+      s.players[deviceId] = { name: me.name, bet: 0, side: null, out: false };
+      return s;
+    }).catch(function () {});
+  }
+
+  function startPresence() {
+    stopPresence();
+    beatPresence();
+    heartbeatTimer = setInterval(beatPresence, 15000);
+  }
+
+  function stopPresence() {
+    if (heartbeatTimer) { clearInterval(heartbeatTimer); heartbeatTimer = null; }
+  }
+
+  function clearPresence() {
+    if (!roomCode) return;
+    db.set(["rooms", roomCode, "presence", deviceId], null).catch(function () {});
+  }
+
   function enterRoom(code) {
     roomCode = String(code).toUpperCase();
     showOnly("#screen-room");
@@ -798,9 +849,12 @@ window.FIREBASE_CONFIG = {
     db.get(["rooms", roomCode]).then(function (v) {
       if (v) { state = v; render(); }
     });
+    startPresence();
   }
 
   function leaveRoom() {
+    stopPresence();
+    clearPresence();
     if (unsubRoom) { unsubRoom(); unsubRoom = null; }
     roomCode = null; state = null;
     if (me) enterSingleRoom();
@@ -949,17 +1003,6 @@ window.FIREBASE_CONFIG = {
     render();
   }
 
-  function logout() {
-    try { localStorage.removeItem(LS_DEVICE); } catch (e) {}
-    me = null;
-    if (unsubRoom) { unsubRoom(); unsubRoom = null; }
-    roomCode = null; state = null;
-    showLogin();
-    var f = $("#fio");
-    if (f) f.value = "";
-    toast("Профиль отвязан от устройства");
-  }
-
   /* ---------------- rendering ---------------- */
   function render() {
     if (!state) return;
@@ -978,13 +1021,13 @@ window.FIREBASE_CONFIG = {
     var ul = $("#players-list");
     var counter = $("#players-count");
     if (!ul) return;
-    var list = playersList().slice().sort(function (a, b) {
+    var list = playersList().filter(function (p) { return p.online; }).sort(function (a, b) {
       if (a.out !== b.out) return a.out ? 1 : -1;
       return b.bet - a.bet;
     });
-    if (counter) counter.textContent = String(list.filter(function (p) { return p.bet > 0; }).length);
+    if (counter) counter.textContent = String(list.length);
     if (!list.length) {
-      ul.innerHTML = '<li class="empty-players">Пока никого. Позовите друзей — ссылка одна для всех.</li>';
+      ul.innerHTML = '<li class="empty-players">Никого нет онлайн. Позовите друзей — ссылка одна для всех.</li>';
       return;
     }
     var html = "";
@@ -1087,15 +1130,18 @@ window.FIREBASE_CONFIG = {
 
   function tablePlayers() {
     var map = {}, order = [];
+    var online = onlineSet();
     function add(k, name) {
       if (!map[k]) { map[k] = { key: k, name: name || "Игрок" }; order.push(k); }
       else if (name) map[k].name = name;
     }
-    playersList().forEach(function (p) { add(p.key, p.name); });
+    playersList().forEach(function (p) { if (p.online) add(p.key, p.name); });
     var rounds = state.rounds || {};
     Object.keys(rounds).forEach(function (rn) {
       var res = rounds[rn] || {};
-      Object.keys(res).forEach(function (k) { add(k, res[k] && res[k].name); });
+      Object.keys(res).forEach(function (k) {
+        if (online[k]) add(k, res[k] && res[k].name);
+      });
     });
     return order.map(function (k) { return map[k]; });
   }
@@ -1292,7 +1338,6 @@ window.FIREBASE_CONFIG = {
       case "new-round":
         startNewRound().catch(function (err) { console.error(err); toast("Ошибка", true); });
         break;
-      case "logout": logout(); break;
     }
   });
 
@@ -1342,7 +1387,7 @@ window.FIREBASE_CONFIG = {
       db = makeLocalDB();
       dbKind = "local";
     }
-    var saved = await ensureMe();
+    var saved = deviceId ? await ensureMe() : null;
     if (saved) {
       me = saved;
       await enterSingleRoom();

@@ -2,6 +2,7 @@
 /**
  * Управление игрой «Монетка» из Termux.
  *
+ *   node admin.mjs                — интерактивный режим (status/ban/... по строке)
  *   node admin.mjs status         — раунд, фаза, банк, онлайн и офлайн
  *   node admin.mjs start          — принудительно подбросить монету
  *   node admin.mjs newround       — начать новый раунд
@@ -17,6 +18,8 @@
  * Нужен Node.js 18+ (в Termux: pkg install nodejs).
  * Доступ идёт через правила Firebase, ключи не требуются.
  */
+import readline from "node:readline";
+
 const DB = "https://minigame-b6df4-default-rtdb.firebaseio.com";
 const ROOM = process.env.ROOM || "MAIN";
 const ONLINE_TTL = 60000; // мс: отметка присутствия моложе минуты = онлайн
@@ -393,35 +396,73 @@ function help() {
   console.log('  unban "Саша"          — снять бан');
   console.log('  rename "Саша" "Алекс" — переименовать');
   console.log("  wipe                  — удалить всех и перезапустить");
+  console.log("");
+  console.log("Без команды: node admin.mjs — интерактивный режим, команды по одной строке.");
 }
 
-const command = (process.argv[2] || "status").toLowerCase();
-const arg = process.argv[3];
-const arg2 = process.argv[4];
-
-const actions = {
-  status,
-  start,
-  newround,
-  reset,
-  clear: () => clear(arg),
-  ban: () => ban(arg),
-  unban: () => unban(arg),
-  rename: () => rename(arg, arg2),
-  wipe,
-  help
-};
-
-if (!actions[command]) {
-  console.log("Неизвестная команда. Доступно: status | start | newround | reset | clear | ban | unban | rename | wipe");
-  process.exit(1);
+// разбор строки с учётом кавычек: rename "Саша" "Алекс"
+function parseArgs(line) {
+  const out = [];
+  const re = /"([^"]*)"|'([^']*)'|(\S+)/g;
+  let m;
+  while ((m = re.exec(line)) !== null) out.push(m[1] !== undefined ? m[1] : m[2] !== undefined ? m[2] : m[3]);
+  return out;
 }
 
-Promise.resolve(actions[command]()).catch((err) => {
+function runCommand(cmd, args) {
+  switch (cmd) {
+    case "status": return status();
+    case "start": return start();
+    case "newround": return newround();
+    case "reset": return reset();
+    case "wipe": return wipe();
+    case "clear": return clear(args.join(" "));
+    case "ban": return ban(args.join(" "));
+    case "unban": return unban(args.join(" "));
+    case "rename": return rename(args[0], args[1]);
+    case "help": return help();
+    default:
+      console.log("Неизвестно. Доступно: status | start | newround | reset | clear | ban | unban | rename | wipe");
+      return Promise.resolve();
+  }
+}
+
+function printError(err) {
   console.error("Ошибка:", err.message);
   if (/401|403/.test(err.message)) {
     console.error("Правила Firebase не разрешают это действие. Откройте Realtime Database → Rules,");
     console.error("вставьте database.rules.json и нажмите Publish — после этого команда сработает.");
   }
-  process.exit(1);
-});
+}
+
+async function repl() {
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout, prompt: "admin> " });
+  console.log("Интерактивный режим. help — команды, exit — выход.");
+  rl.prompt();
+  for await (const line of rl) {
+    const parts = parseArgs(line.trim());
+    const cmd = (parts.shift() || "").toLowerCase();
+    if (!cmd) {
+      rl.prompt();
+      continue;
+    }
+    if (cmd === "exit" || cmd === "quit" || cmd === "выход") break;
+    try {
+      await runCommand(cmd, parts);
+    } catch (err) {
+      printError(err);
+    }
+    rl.prompt();
+  }
+  rl.close();
+}
+
+const command = (process.argv[2] || "").toLowerCase();
+if (!command) {
+  repl();
+} else {
+  Promise.resolve(runCommand(command, process.argv.slice(3))).catch((err) => {
+    printError(err);
+    process.exit(1);
+  });
+}

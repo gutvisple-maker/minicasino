@@ -99,9 +99,23 @@ async function reset() {
 }
 
 async function clear() {
-  await del(`/rooms/${ROOM}`);
-  await del("/players");
-  console.log("Никнеймы удалены. Все заходят заново.");
+  const room = await getRoom();
+  const keys = Object.keys((room && room.players) || {});
+  let wipedAll = true;
+  try {
+    await del("/players");
+  } catch (e) {
+    if (!/401|403/.test(e.message)) throw e;
+    wipedAll = false;
+    for (const key of keys) {
+      try { await del(`/players/${key}`); } catch (err) {}
+    }
+  }
+  try { await del(`/rooms/${ROOM}`); } catch (e) {
+    if (!/401|403/.test(e.message)) throw e;
+  }
+  if (wipedAll) console.log("Никнеймы удалены. Все заходят заново.");
+  else console.log("Комната очищена. Полностью стереть профили мешают правила БД — опубликуйте database.rules.json.");
 }
 
 async function wipe() {
@@ -119,5 +133,9 @@ if (!actions[command]) {
 
 actions[command]().catch((err) => {
   console.error("Ошибка:", err.message);
+  if (/401|403/.test(err.message)) {
+    console.error("Правила Firebase не разрешают это действие. Откройте Realtime Database → Rules,");
+    console.error("вставьте database.rules.json и нажмите Publish — после этого команда сработает.");
+  }
   process.exit(1);
 });

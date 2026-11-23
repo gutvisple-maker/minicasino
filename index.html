@@ -419,6 +419,16 @@
   </footer>
 </section>
 
+<section id="screen-ban" class="screen hidden">
+  <div class="login-card">
+    <div class="logo">
+      <div class="mark">М</div>
+      <div><h1>МОНЕТКА <span>мини-казино для своих</span></h1></div>
+    </div>
+    <p class="lead">Доступ с этого устройства закрыт администратором.</p>
+  </div>
+</section>
+
 <div class="toast-wrap" id="toasts"></div>
 
 <script>/* MultiTool · Монетка — конфиг Firebase.
@@ -726,6 +736,10 @@ window.FIREBASE_CONFIG = {
       deviceId = uuid();
       try { localStorage.setItem(LS_DEVICE, deviceId); } catch (e) {}
     }
+    try {
+      var ban = await db.get(["bans", deviceId]);
+      if (ban) { showBan(); toast("Доступ с этого устройства заблокирован", true); return; }
+    } catch (e) {}
     var existing = await db.get(["players", deviceId]);
     var rec = existing || {};
     delete rec.blocked;
@@ -767,10 +781,14 @@ window.FIREBASE_CONFIG = {
   function showOnly(id) {
     var boot = $("#boot");
     if (boot) boot.classList.add("hidden");
-    ["#screen-login", "#screen-room"].forEach(function (sel) {
+    ["#screen-login", "#screen-room", "#screen-ban"].forEach(function (sel) {
       var el = $(sel);
       if (el) el.classList.toggle("hidden", sel !== id);
     });
+  }
+  function showBan() {
+    showOnly("#screen-ban");
+    document.title = "Монетка — доступ закрыт";
   }
   function showLogin() {
     showOnly("#screen-login");
@@ -1434,6 +1452,12 @@ window.FIREBASE_CONFIG = {
       console.error(e);
       db = makeLocalDB();
       dbKind = "local";
+    }
+    if (deviceId) {
+      try {
+        var banRec = await db.get(["bans", deviceId]);
+        if (banRec) { showBan(); return; }
+      } catch (e) {}
     }
     var rec = deviceId ? await db.get(["players", deviceId]) : null;
     var saved = rec && rec.name ? { name: rec.name } : null;

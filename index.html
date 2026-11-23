@@ -728,6 +728,7 @@ window.FIREBASE_CONFIG = {
     }
     var existing = await db.get(["players", deviceId]);
     var rec = existing || {};
+    delete rec.blocked;
     rec.name = name;
     // Поле не используется в интерфейсе, но нужно для совместимости с правилами БД.
     rec.balance = Number(rec.balance) || 0;
@@ -1434,8 +1435,9 @@ window.FIREBASE_CONFIG = {
       db = makeLocalDB();
       dbKind = "local";
     }
-    var saved = deviceId ? await ensureMe() : null;
-    if (!saved) {
+    var rec = deviceId ? await db.get(["players", deviceId]) : null;
+    var saved = rec && rec.name ? { name: rec.name } : null;
+    if (!saved && !(rec && rec.blocked)) {
       // профиль в базе могли удалить (clear/wipe) — восстанавливаем по локальной памяти
       var cached = readLocalProfile();
       if (cached && cached.name) {

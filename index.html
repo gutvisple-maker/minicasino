@@ -891,6 +891,26 @@ window.FIREBASE_CONFIG = {
     render();
   }
 
+  async function cancelBet() {
+    if (!state || state.phase !== "betting") { toast("Ставку уже нельзя отменить", true); return; }
+    var mine = myEntry();
+    if (!mine || !(Number(mine.bet) > 0)) return;
+    var res = await db.transact(["rooms", roomCode], function (s) {
+      if (!s || s.phase !== "betting") return ABORT;
+      s.players = s.players || {};
+      var p = s.players[deviceId];
+      if (!p || !(Number(p.bet) > 0)) return ABORT;
+      s.pot = Math.max(0, (Number(s.pot) || 0) - Number(p.bet));
+      p.bet = 0;
+      p.side = null;
+      p.out = false;
+      return s;
+    });
+    if (!res.ok) { toast("Ставку уже нельзя отменить", true); return; }
+    betDraft = "";
+    render();
+  }
+
   async function pickSide(side) {
     if (!state || state.phase !== "pick") return;
     await db.transact(["rooms", roomCode], function (s) {
@@ -1245,6 +1265,9 @@ window.FIREBASE_CONFIG = {
     } else if (phase === "flipping") {
       controls = '<div class="bet-actions"><span class="bet-note">Все выбрали сторону — можно кидать монету.</span>' +
         (alive >= 2 ? '<button class="btn primary" type="button" data-act="flip">Кинуть монету</button>' : '') + '</div>';
+    } else if (phase === "betting") {
+      controls = '<div class="bet-actions"><span class="bet-note">Ставка принята — можно отменить до подброса.</span>' +
+        '<button class="btn ghost" type="button" data-act="cancel-bet">Отменить ставку</button></div>';
     } else {
       controls = '<div class="bet-actions"><span class="bet-note">Ставки в этом раунде закрыты. Ждём подброс.</span></div>';
     }
@@ -1326,6 +1349,9 @@ window.FIREBASE_CONFIG = {
 
     var act = target.getAttribute("data-act");
     switch (act) {
+      case "cancel-bet":
+        cancelBet().catch(function () { toast("Не удалось отменить ставку", true); });
+        break;
       case "place-bet": {
         var amountInput = $("#bet-amount");
         var amount = amountInput ? amountInput.value : 0;

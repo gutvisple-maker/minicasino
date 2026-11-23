@@ -8,6 +8,9 @@
  *   node admin.mjs reset          — перезапуск, остаются только онлайн
  *   node admin.mjs clear ""       — удалить всех игроков
  *   node admin.mjs clear "Саша"   — удалить только этого игрока
+ *   node admin.mjs ban "Саша"     — забанить устройство
+ *   node admin.mjs unban "Саша"   — снять бан
+ *   node admin.mjs rename "Саша" "Алекс" — переименовать
  *   node admin.mjs wipe           — удалить всех и перезапустить
  *   node admin.mjs help           — список команд
  *
@@ -152,6 +155,19 @@ async function collectPlayers(room) {
   return all;
 }
 
+// сначала ищем среди тех, кто за столом, потом точное имя, потом часть имени
+function resolveTargets(all, room, query) {
+  const q = String(query || "").trim().toLowerCase();
+  const entries = Object.entries(all);
+  if (!q) return entries;
+  const roomKeys = new Set(Object.keys((room && room.players) || {}));
+  const inRoom = entries.filter(([key, p]) => roomKeys.has(key) && p.name.toLowerCase().includes(q));
+  if (inRoom.length) return inRoom;
+  const exact = entries.filter(([, p]) => p.name.toLowerCase() === q);
+  if (exact.length) return exact;
+  return entries.filter(([, p]) => p.name.toLowerCase().includes(q));
+}
+
 async function status() {
   const room = await getRoom();
   if (!room) {
@@ -168,6 +184,9 @@ async function status() {
   console.log(`Раунд ${room.round || 1}, фаза: ${room.phase || "—"}, банк ${room.pot || 0}`);
   console.log(`Онлайн (${online.length}): ${online.join("; ") || "никого"}`);
   console.log(`Офлайн (${offline.length}): ${offline.join("; ") || "никого"}`);
+  const bans = await getBans();
+  const banned = Object.values(bans).map((b) => (b && b.name) || "?").filter(Boolean);
+  if (banned.length) console.log(`Забанены (${banned.length}): ${banned.join("; ")}`);
 }
 
 async function start() {
@@ -238,9 +257,7 @@ async function clear(arg) {
     return;
   }
   const all = await collectPlayers(room);
-  const targets = Object.entries(all)
-    .filter(([, p]) => !query || p.name.toLowerCase().includes(query))
-    .map(([key, p]) => ({ key, name: p.name }));
+  const targets = resolveTargets(all, room, arg).map(([key, p]) => ({ key, name: p.name }));
 
   if (!targets.length) {
     console.log(query ? `Никого не нашли по «${arg}»` : "Игроков нет.");
@@ -278,6 +295,83 @@ async function clear(arg) {
   }
 }
 
+async function getBans() {
+  try {
+    return (await http("/bans")) || {};
+  } catch (e) {
+    if (/401|403/.test(e.message)) return {};
+    throw e;
+  }
+}
+
+async function ban(name) {
+  const query = String(name || "").trim().toLowerCase();
+  if (!query) {
+    console.log('Укажите имя: node admin.mjs ban "Саша"');
+    return;
+  }
+  const room = await getRoom();
+  const all = await collectPlayers(room || {});
+  const targets = resolveTargets(all, room, name);
+  if (!targets.length) {
+    console.log(`Никого не нашли по «${name}»`);
+    return;
+  }
+  const now = Date.now();
+  for (const [key, p] of targets) {
+    await http(`/bans/${key}`, "PUT", { name: p.name, at: now });
+    await del(`/rooms/${ROOM}/players/${key}`).catch(() => {});
+    await del(`/rooms/${ROOM}/presence/${key}`).catch(() => {});
+    console.log(`Забанено устройство: ${p.name} (${key.slice(0, 8)}…)`);
+  }
+}
+
+async function unban(name) {
+  const query = String(name || "").trim().toLowerCase();
+  const bans = await getBans();
+  const targets = Object.entries(bans).filter(([, b]) => !query || String((b && b.name) || "").toLowerCase().includes(query));
+  if (!targets.length) {
+    console.log(query ? `Забаненных по «${name}» нет.` : "Забаненных нет.");
+    return;
+  }
+  for (const [key, b] of targets) {
+    await del(`/bans/${key}`);
+    console.log(`Разбанено: ${(b && b.name) || key}`);
+  }
+}
+
+async function rename(oldName, newName) {
+  const query = String(oldName || "").trim().toLowerCase();
+  const next = String(newName || "").trim().replace(/\s+/g, " ");
+  if (!query || next.length < 2) {
+    console.log('Так: node admin.mjs rename "Саша" "Александр"');
+    return;
+  }
+  const room = await getRoom();
+  const all = await collectPlayers(room || {});
+  const targets = resolveTargets(all, room, oldName);
+  if (!targets.length) {
+    console.log(`Никого не нашли по «${oldName}»`);
+    return;
+  }
+  for (const [key, p] of targets) {
+    let rec = null;
+    try { rec = await http(`/players/${key}`); } catch (e) { if (!/401|403/.test(e.message)) throw e; }
+    if (rec && rec.name) {
+      rec.name = next;
+      delete rec.blocked;
+      await http(`/players/${key}`, "PUT", rec);
+    }
+    if (room && room.players && room.players[key]) {
+      await patch(`/rooms/${ROOM}/players/${key}`, { name: next }).catch(() => {});
+    }
+    if (room && room.presence && room.presence[key]) {
+      await patch(`/rooms/${ROOM}/presence/${key}`, { name: next }).catch(() => {});
+    }
+    console.log(`${p.name} → ${next}`);
+  }
+}
+
 async function wipe() {
   const room = await getRoom();
   if (room) {
@@ -289,17 +383,21 @@ async function wipe() {
 
 function help() {
   console.log("Команды:");
-  console.log("  status          — раунд, фаза, банк, онлайн и офлайн");
-  console.log("  start           — принудительно подбросить монету");
-  console.log("  newround        — начать новый раунд");
-  console.log("  reset           — перезапуск, остаются только онлайн");
-  console.log('  clear ""        — удалить всех игроков');
-  console.log('  clear "Саша"    — удалить только этого игрока');
-  console.log("  wipe            — удалить всех и перезапустить");
+  console.log("  status                — раунд, онлайн, офлайн, баны");
+  console.log("  start                 — принудительно подбросить монету");
+  console.log("  newround              — начать новый раунд");
+  console.log("  reset                 — перезапуск, остаются только онлайн");
+  console.log('  clear ""              — удалить всех игроков');
+  console.log('  clear "Саша"          — удалить только этого игрока');
+  console.log('  ban "Саша"            — забанить устройство');
+  console.log('  unban "Саша"          — снять бан');
+  console.log('  rename "Саша" "Алекс" — переименовать');
+  console.log("  wipe                  — удалить всех и перезапустить");
 }
 
 const command = (process.argv[2] || "status").toLowerCase();
 const arg = process.argv[3];
+const arg2 = process.argv[4];
 
 const actions = {
   status,
@@ -307,12 +405,15 @@ const actions = {
   newround,
   reset,
   clear: () => clear(arg),
+  ban: () => ban(arg),
+  unban: () => unban(arg),
+  rename: () => rename(arg, arg2),
   wipe,
   help
 };
 
 if (!actions[command]) {
-  console.log("Неизвестная команда. Доступно: status | start | newround | reset | clear | wipe");
+  console.log("Неизвестная команда. Доступно: status | start | newround | reset | clear | ban | unban | rename | wipe");
   process.exit(1);
 }
 

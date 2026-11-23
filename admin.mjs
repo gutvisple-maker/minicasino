@@ -2,15 +2,17 @@
 /**
  * Управление игрой «Монетка» из Termux.
  *
- *   node admin.mjs status     — что сейчас в комнате и кто онлайн
- *   node admin.mjs start      — принудительно подбросить монету (или начать новый раунд)
- *   node admin.mjs newround   — начать новый раунд, не дожидаясь кнопки в браузере
- *   node admin.mjs reset      — перезапустить игру, оставить только онлайн
- *   node admin.mjs clear      — удалить никнеймы (все заходят заново)
- *   node admin.mjs wipe       — удалить никнеймы и перезапустить игру
+ *   node admin.mjs status         — раунд, фаза, банк, онлайн и офлайн
+ *   node admin.mjs start          — принудительно подбросить монету
+ *   node admin.mjs newround       — начать новый раунд
+ *   node admin.mjs reset          — перезапуск, остаются только онлайн
+ *   node admin.mjs clear ""       — удалить всех игроков
+ *   node admin.mjs clear "Саша"   — удалить только этого игрока
+ *   node admin.mjs wipe           — удалить всех и перезапустить
+ *   node admin.mjs help           — список команд
  *
  * Нужен Node.js 18+ (в Termux: pkg install nodejs).
- * Доступ идёт через открытые правила Firebase, ключи не требуются.
+ * Доступ идёт через правила Firebase, ключи не требуются.
  */
 const DB = "https://minigame-b6df4-default-rtdb.firebaseio.com";
 const ROOM = process.env.ROOM || "MAIN";
@@ -31,6 +33,7 @@ async function http(path, method = "GET", body) {
 
 const getRoom = () => http(`/rooms/${ROOM}`);
 const putRoom = (room) => http(`/rooms/${ROOM}`, "PUT", room);
+const patch = (path, body) => http(path, "PATCH", body);
 const del = (path) => http(path, "DELETE");
 
 function onlineMap(presence) {
@@ -122,20 +125,49 @@ function forceFlip(room) {
   return { room, survivors: survivors.length, result };
 }
 
+// все известные игроки: из комнаты, присутствия и профилей
+async function collectPlayers(room) {
+  const all = {}; // key -> { name, bet, online }
+  const presence = (room && room.presence) || {};
+  const on = onlineMap(presence);
+  let profiles = null;
+  try {
+    profiles = await http("/players");
+  } catch (e) {
+    if (!/401|403/.test(e.message)) throw e;
+  }
+  for (const [key, val] of Object.entries(profiles || {})) {
+    if (val && val.blocked) continue;
+    all[key] = { name: (val && val.name) || "Игрок", bet: 0, online: !!on[key] };
+  }
+  for (const [key, val] of Object.entries((room && room.players) || {})) {
+    if (!all[key]) all[key] = { name: (val && val.name) || "Игрок", bet: 0, online: !!on[key] };
+    all[key].name = (val && val.name) || all[key].name;
+    all[key].bet = Number(val && val.bet) || 0;
+  }
+  for (const [key, name] of Object.entries(on)) {
+    if (!all[key]) all[key] = { name, bet: 0, online: true };
+    else all[key].online = true;
+  }
+  return all;
+}
+
 async function status() {
   const room = await getRoom();
   if (!room) {
     console.log("Комната пуста — откройте сайт, она создастся сама.");
     return;
   }
-  const on = onlineMap(room.presence);
-  console.log(`Раунд ${room.round || 1}, фаза: ${room.phase || "—"}`);
-  const names = Object.entries(on).map(([key, name]) => {
-    const p = (room.players || {})[key];
-    const bet = p && Number(p.bet) > 0 ? `, ставка ${p.bet}` : "";
-    return `${name}${bet}`;
-  });
-  console.log(`Онлайн (${names.length}): ${names.join("; ") || "никого"}`);
+  const all = await collectPlayers(room);
+  const online = [], offline = [];
+  for (const key of Object.keys(all)) {
+    const p = all[key];
+    const line = p.name + (p.bet > 0 ? ` — ставка ${p.bet}` : "");
+    (p.online ? online : offline).push(line);
+  }
+  console.log(`Раунд ${room.round || 1}, фаза: ${room.phase || "—"}, банк ${room.pot || 0}`);
+  console.log(`Онлайн (${online.length}): ${online.join("; ") || "никого"}`);
+  console.log(`Офлайн (${offline.length}): ${offline.join("; ") || "никого"}`);
 }
 
 async function start() {
@@ -197,50 +229,94 @@ async function reset() {
   console.log("Игра перезапущена. Онлайн: " + Object.values(players).map((p) => p.name).join(", "));
 }
 
-async function clear() {
+// clear "" — все, clear "имя" — только совпадающие по имени
+async function clear(arg) {
+  const query = String(arg === undefined || arg === null ? "" : arg).trim().toLowerCase();
   const room = await getRoom();
-  const keys = Object.keys((room && room.players) || {});
-  let wipedAll = true;
-  try {
-    await del("/players");
-  } catch (e) {
-    if (!/401|403/.test(e.message)) throw e;
-    wipedAll = false;
-    for (const key of keys) {
-      try { await del(`/players/${key}`); } catch (err) {}
+  if (!room) {
+    console.log("Комната пуста.");
+    return;
+  }
+  const all = await collectPlayers(room);
+  const targets = Object.entries(all)
+    .filter(([, p]) => !query || p.name.toLowerCase().includes(query))
+    .map(([key, p]) => ({ key, name: p.name }));
+
+  if (!targets.length) {
+    console.log(query ? `Никого не нашли по «${arg}»` : "Игроков нет.");
+    return;
+  }
+
+  let pot = Number(room.pot) || 0;
+  let potChanged = false;
+  for (const { key } of targets) {
+    const p = (room.players || {})[key];
+    if (p && Number(p.bet) > 0 && room.phase !== "result") {
+      pot -= Number(p.bet) || 0;
+      potChanged = true;
     }
+    // «надгробие»: профиль больше не восстанавливается на устройстве автоматически
+    try {
+      await http(`/players/${key}`, "PUT", { name: "", balance: 0, blocked: true });
+    } catch (e) {
+      if (!/401|403/.test(e.message)) throw e;
+    }
+    await del(`/rooms/${ROOM}/players/${key}`).catch(() => {});
+    await del(`/rooms/${ROOM}/presence/${key}`).catch(() => {});
   }
-  try { await del(`/rooms/${ROOM}`); } catch (e) {
-    if (!/401|403/.test(e.message)) throw e;
+  if (potChanged) await patch(`/rooms/${ROOM}`, { pot: Math.max(0, pot) });
+
+  const after = await getRoom();
+  const left = Object.keys((after && after.players) || {}).filter((k) =>
+    targets.some((t) => t.key === k)
+  );
+  if (!query) console.log(`Удалены все игроки (${targets.length}): ${targets.map((t) => t.name).join(", ")}.`);
+  else console.log(`Удалён: ${targets.map((t) => t.name).join(", ")}.`);
+  if (left.length) {
+    console.log("Не убрались со стола: " + left.map((k) => all[k].name).join(", ") + ".");
+    console.log("Опубликуйте database.rules.json в Realtime Database → Rules (в новых правилах игроки необязательны).");
   }
-  if (wipedAll) console.log("Никнеймы удалены. Все заходят заново.");
-  else console.log("Комната очищена. Полностью стереть профили мешают правила БД — опубликуйте database.rules.json.");
 }
 
 async function wipe() {
-  await clear();
+  const room = await getRoom();
+  if (room) {
+    try { await clear(""); } catch (e) { if (!/401|403/.test(e.message)) throw e; }
+  }
+  await del(`/rooms/${ROOM}`).catch(() => {});
   console.log("Игра перезапущена с чистого листа.");
 }
 
 function help() {
   console.log("Команды:");
-  console.log("  status    — кто онлайн и состояние комнаты");
-  console.log("  start     — принудительно подбросить монету (после результата — новый раунд)");
-  console.log("  newround  — начать новый раунд сразу");
-  console.log("  reset     — перезапуск, остаются только онлайн");
-  console.log("  clear     — удалить никнеймы");
-  console.log("  wipe      — удалить никнеймы и перезапустить");
+  console.log("  status          — раунд, фаза, банк, онлайн и офлайн");
+  console.log("  start           — принудительно подбросить монету");
+  console.log("  newround        — начать новый раунд");
+  console.log("  reset           — перезапуск, остаются только онлайн");
+  console.log('  clear ""        — удалить всех игроков');
+  console.log('  clear "Саша"    — удалить только этого игрока');
+  console.log("  wipe            — удалить всех и перезапустить");
 }
 
 const command = (process.argv[2] || "status").toLowerCase();
-const actions = { status, start, newround, reset, clear, wipe, help };
+const arg = process.argv[3];
+
+const actions = {
+  status,
+  start,
+  newround,
+  reset,
+  clear: () => clear(arg),
+  wipe,
+  help
+};
 
 if (!actions[command]) {
   console.log("Неизвестная команда. Доступно: status | start | newround | reset | clear | wipe");
   process.exit(1);
 }
 
-actions[command]().catch((err) => {
+Promise.resolve(actions[command]()).catch((err) => {
   console.error("Ошибка:", err.message);
   if (/401|403/.test(err.message)) {
     console.error("Правила Firebase не разрешают это действие. Откройте Realtime Database → Rules,");

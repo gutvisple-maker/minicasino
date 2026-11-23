@@ -6,6 +6,7 @@
  *   node admin.mjs status         — раунд, фаза, банк, онлайн и офлайн
  *   node admin.mjs start          — принудительно подбросить монету
  *   node admin.mjs newround       — начать новый раунд
+ *   node admin.mjs round          — сбросить все раунды (номер 1, история пуста)
  *   node admin.mjs reset          — перезапуск, остаются только онлайн
  *   node admin.mjs clear ""       — удалить всех игроков
  *   node admin.mjs clear "Саша"   — удалить только этого игрока
@@ -93,12 +94,19 @@ function forceFlip(room) {
   if (alive.length < 2) return { error: "Нужно минимум 2 участника со ставкой" };
 
   const result = Math.random() < 0.5 ? "H" : "T";
-  const survivors = [];
-  alive.forEach(([key, p]) => {
-    if (!p.side) p.side = Math.random() < 0.5 ? "H" : "T";
-    if (p.side === result) survivors.push(key);
-    else p.out = true;
+  let survivors = [];
+  const missed = [];
+  alive.forEach(([key]) => {
+    // у каждого свой независимый подброс 50/50
+    if (Math.random() < 0.5) survivors.push(key);
+    else missed.push(key);
   });
+  if (!survivors.length) {
+    // все проиграли — никто не выбывает, кидаем снова
+    survivors = alive.map(([key]) => key);
+  } else {
+    missed.forEach((key) => { players[key].out = true; });
+  }
   survivors.forEach((key) => { players[key].side = null; });
 
   room.stage = (Number(room.stage) || 0) + 1;
@@ -126,7 +134,7 @@ function forceFlip(room) {
     room.phase = "result";
     room.awarded = false;
   } else {
-    room.phase = "pick";
+    room.phase = "flipping";
   }
   return { room, survivors: survivors.length, result };
 }
@@ -215,7 +223,7 @@ async function start() {
     const winner = res.room.players[res.room.winner];
     console.log(`Монета: ${face}. Победитель — ${winner ? winner.name : "?"}, ставки: ${res.room.prize}.`);
   } else {
-    console.log(`Монета: ${face}. Продолжают ${res.survivors} — нужен тай-брейк.`);
+    console.log(`Монета: ${face}. Продолжают ${res.survivors} — кидаем снова.`);
   }
 }
 
@@ -228,6 +236,31 @@ async function newround() {
   startNewRound(room);
   await putRoom(room);
   console.log(`Новый раунд ${room.round}. Ставки обнулены.`);
+}
+
+async function round() {
+  const room = await getRoom();
+  if (!room) {
+    console.log("Комната пуста — откройте сайт, она создастся сама.");
+    return;
+  }
+  room.round = 1;
+  room.phase = "betting";
+  room.pot = 0;
+  room.stage = 0;
+  room.lastFlip = null;
+  room.winner = null;
+  room.prize = 0;
+  room.winSide = null;
+  room.awarded = true;
+  room.rounds = {};
+  for (const p of Object.values(room.players || {})) {
+    p.bet = 0;
+    p.side = null;
+    p.out = false;
+  }
+  await putRoom(room);
+  console.log("Все раунды сброшены: раунд 1, история и ставки очищены.");
 }
 
 async function reset() {
@@ -389,6 +422,7 @@ function help() {
   console.log("  status                — раунд, онлайн, офлайн, баны");
   console.log("  start                 — принудительно подбросить монету");
   console.log("  newround              — начать новый раунд");
+  console.log("  round                 — сбросить все раунды (номер 1, история пуста)");
   console.log("  reset                 — перезапуск, остаются только онлайн");
   console.log('  clear ""              — удалить всех игроков');
   console.log('  clear "Саша"          — удалить только этого игрока');
@@ -414,6 +448,7 @@ function runCommand(cmd, args) {
     case "status": return status();
     case "start": return start();
     case "newround": return newround();
+    case "round": return round();
     case "reset": return reset();
     case "wipe": return wipe();
     case "clear": return clear(args.join(" "));
@@ -422,7 +457,7 @@ function runCommand(cmd, args) {
     case "rename": return rename(args[0], args[1]);
     case "help": return help();
     default:
-      console.log("Неизвестно. Доступно: status | start | newround | reset | clear | ban | unban | rename | wipe");
+      console.log("Неизвестно. Доступно: status | start | newround | round | reset | clear | ban | unban | rename | wipe");
       return Promise.resolve();
   }
 }

@@ -38,6 +38,7 @@
   button{cursor:pointer;border:0;background:none}
   .hidden{display:none !important}
   .screen{min-height:100dvh;display:flex;flex-direction:column}
+  #boot{position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;background:var(--bg);color:var(--muted);font-weight:700;letter-spacing:.16em;font-size:13px}
   .muted{color:var(--muted)}
   .mono{font-variant-numeric:tabular-nums}
 
@@ -357,7 +358,8 @@
 <body>
 
 <!-- ======== LOGIN ======== -->
-<section id="screen-login" class="screen">
+<div id="boot">МОНЕТКА</div>
+<section id="screen-login" class="screen hidden">
   <div class="login-card">
     <div class="logo">
       <div class="mark">М</div>
@@ -441,6 +443,7 @@ window.FIREBASE_CONFIG = {
   var $ = function (s) { return document.querySelector(s); };
   var ABORT = { __abort: true };
   var LS_DEVICE = "mtc_device";
+  var LS_PROFILE = "mtc_profile";
   var LS_DB = "mtc_local_db";
 
   var CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -732,7 +735,23 @@ window.FIREBASE_CONFIG = {
     rec.updatedAt = Date.now();
     await db.set(["players", deviceId], rec);
     me = { name: name };
+    saveLocalProfile(name);
     await enterSingleRoom();
+  }
+
+  function saveLocalProfile(name) {
+    try {
+      localStorage.setItem(LS_PROFILE, JSON.stringify({ name: name, device: deviceId || null }));
+    } catch (e) {}
+  }
+
+  function readLocalProfile() {
+    try {
+      var raw = localStorage.getItem(LS_PROFILE);
+      if (!raw) return null;
+      var p = JSON.parse(raw);
+      return p && p.name ? p : null;
+    } catch (e) { return null; }
   }
 
   function updateWallet() {
@@ -745,6 +764,8 @@ window.FIREBASE_CONFIG = {
 
   /* ---------------- navigation ---------------- */
   function showOnly(id) {
+    var boot = $("#boot");
+    if (boot) boot.classList.add("hidden");
     ["#screen-login", "#screen-room"].forEach(function (sel) {
       var el = $(sel);
       if (el) el.classList.toggle("hidden", sel !== id);
@@ -1414,8 +1435,26 @@ window.FIREBASE_CONFIG = {
       dbKind = "local";
     }
     var saved = deviceId ? await ensureMe() : null;
+    if (!saved) {
+      // профиль в базе могли удалить (clear/wipe) — восстанавливаем по локальной памяти
+      var cached = readLocalProfile();
+      if (cached && cached.name) {
+        if (!deviceId) {
+          deviceId = cached.device || uuid();
+          try { localStorage.setItem(LS_DEVICE, deviceId); } catch (e) {}
+        }
+        await db.set(["players", deviceId], {
+          name: cached.name,
+          balance: 0,
+          device: deviceId,
+          updatedAt: Date.now()
+        });
+        saved = { name: cached.name };
+      }
+    }
     if (saved) {
       me = saved;
+      saveLocalProfile(saved.name);
       await enterSingleRoom();
     } else {
       showLogin();

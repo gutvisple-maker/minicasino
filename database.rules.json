@@ -1,0 +1,36 @@
+{
+  "rules": {
+    "players": {
+      ".read": true,
+      ".write": true,
+      "$device": {
+        ".validate": "!newData.exists() || (newData.hasChildren(['name', 'balance']) && newData.child('name').isString() && newData.child('name').val().length <= 80 && newData.child('balance').isNumber())"
+      }
+    },
+    "bans": {
+      ".read": true,
+      ".write": true,
+      "$device": {
+        ".validate": "!newData.exists() || newData.child('at').isNumber()"
+      }
+    },
+    "roles": {
+      ".read": true,
+      ".write": true,
+      "$device": {
+        ".validate": "!newData.exists() || (newData.child('role').isString() && newData.child('name').isString())"
+      }
+    },
+    "rooms": {
+      ".read": true,
+      ".write": true,
+      "$code": {
+        ".validate": "!newData.exists() || newData.hasChildren(['phase'])"
+      }
+    },
+    "$other": {
+      ".read": false,
+      ".write": false
+    }
+  }
+}

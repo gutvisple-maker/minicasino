@@ -296,6 +296,19 @@
   }
   .winner-banner .cup{font-size:22px}
 
+  /* ---------- админ-панель ---------- */
+  .panel-page{width:100%;max-width:980px;margin:0 auto;padding:16px;display:grid;gap:14px}
+  .panel-card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px}
+  .panel-card h3{margin:0 0 10px;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+  .panel-buttons{display:flex;flex-wrap:wrap;gap:8px}
+  .panel-buttons .btn{padding:10px 14px;font-size:13px}
+  .panel-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+  .panel-row input{flex:1;min-width:140px;padding:10px 12px;border-radius:10px;background:#0a1116;border:1px solid var(--line);outline:none;color:var(--text)}
+  .panel-log{background:#0a1116;border:1px solid var(--line);border-radius:12px;padding:10px 12px;min-height:60px;max-height:220px;overflow:auto;font-size:12.5px;color:var(--muted);white-space:pre-wrap}
+  .btn.danger{border-color:rgba(255,93,108,.45);color:#ffb3ba}
+  .panel-info-line{display:flex;justify-content:space-between;gap:10px;padding:5px 0;font-size:13.5px;border-bottom:1px dashed rgba(255,255,255,.06)}
+  .panel-info-line:last-child{border-bottom:0}
+
   /* toast */
   .toast-wrap{position:fixed;left:50%;bottom:96px;transform:translateX(-50%);z-index:100;display:flex;flex-direction:column;gap:8px;align-items:center;pointer-events:none}
   .toast{
@@ -391,6 +404,7 @@
     <div class="spacer"></div>
     <div class="wallet">
       <span class="who" id="room-name"></span>
+      <button class="btn ghost hidden" id="panel-open" data-act="open-panel">панель</button>
     </div>
   </header>
 
@@ -417,6 +431,41 @@
   <footer class="betbar">
     <div class="betbar-inner" id="betbar"></div>
   </footer>
+</section>
+
+<section id="screen-panel" class="screen hidden">
+  <header class="topbar">
+    <div class="brand">МОНЕТКА<small>панель</small></div>
+    <div class="spacer"></div>
+    <div class="wallet">
+      <span class="who" id="panel-role"></span>
+      <button class="btn ghost" data-act="panel-close">в игру</button>
+    </div>
+  </header>
+  <div class="panel-page">
+    <div class="panel-card" id="panel-info">Загрузка…</div>
+    <div class="panel-card">
+      <h3>Игра</h3>
+      <div class="panel-buttons" id="panel-game"></div>
+    </div>
+    <div class="panel-card hidden" id="panel-admin-card">
+      <h3>Игроки</h3>
+      <div class="panel-row">
+        <input id="panel-name" placeholder="Имя игрока">
+        <button class="btn" data-act="p-ban">Бан</button>
+        <button class="btn" data-act="p-unban">Разбан</button>
+      </div>
+      <div class="panel-row">
+        <input id="panel-new" placeholder="Новое имя">
+        <button class="btn" data-act="p-rename">Переименовать</button>
+      </div>
+      <div class="panel-row">
+        <button class="btn danger" data-act="p-clear-name">Удалить игрока</button>
+        <button class="btn danger" data-act="p-clear-all">Удалить всех</button>
+      </div>
+    </div>
+    <div class="panel-log" id="panel-log"></div>
+  </div>
 </section>
 
 <section id="screen-ban" class="screen hidden">
@@ -512,6 +561,7 @@ window.FIREBASE_CONFIG = {
   /* ---------------- state ---------------- */
   var deviceId = getDeviceId();
   var me = null;               // {name}
+  var myRole = null;           // 'admin' | 'owner' | null
   var db = null;
   var dbKind = "";
   var state = null;            // room state
@@ -750,7 +800,10 @@ window.FIREBASE_CONFIG = {
     await db.set(["players", deviceId], rec);
     me = { name: name };
     saveLocalProfile(name);
+    await loadRole();
     await enterSingleRoom();
+    updatePanelButton();
+    if (location.hash.indexOf("panel") >= 0 && myRole) openPanel();
   }
 
   function saveLocalProfile(name) {
@@ -780,7 +833,7 @@ window.FIREBASE_CONFIG = {
   function showOnly(id) {
     var boot = $("#boot");
     if (boot) boot.classList.add("hidden");
-    ["#screen-login", "#screen-room", "#screen-ban"].forEach(function (sel) {
+    ["#screen-login", "#screen-room", "#screen-ban", "#screen-panel"].forEach(function (sel) {
       var el = $(sel);
       if (el) el.classList.toggle("hidden", sel !== id);
     });
@@ -868,6 +921,7 @@ window.FIREBASE_CONFIG = {
     showOnly("#screen-room");
     document.title = "Монетка — общий стол";
     updateWallet();
+    updatePanelButton();
     lastStageSeen = -1;
     betDraft = "";
     if (unsubRoom) unsubRoom();
@@ -1319,6 +1373,256 @@ window.FIREBASE_CONFIG = {
   }
   function escapeAttr(s) { return escapeHtml(s).replace(/"/g, "&quot;"); }
 
+  /* ---------------- админ-панель ---------------- */
+  var DBURL = (window.FIREBASE_CONFIG && window.FIREBASE_CONFIG.databaseURL) || "";
+
+  function api(path, method, body) {
+    return fetch(DBURL + path + ".json", {
+      method: method || "GET",
+      headers: body === undefined ? undefined : { "Content-Type": "application/json" },
+      body: body === undefined ? undefined : JSON.stringify(body)
+    }).then(function (r) {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return r.text();
+    }).then(function (t) { return t ? JSON.parse(t) : null; });
+  }
+
+  async function loadRole() {
+    myRole = null;
+    if (!deviceId) return;
+    try {
+      var r = await db.get(["roles", deviceId]);
+      if (r && (r.role === "owner" || r.role === "admin")) myRole = r.role;
+    } catch (e) {}
+  }
+
+  function updatePanelButton() {
+    var b = $("#panel-open");
+    if (b) b.classList.toggle("hidden", !myRole);
+  }
+
+  function panelLog(msg) {
+    var el = $("#panel-log");
+    if (!el) return;
+    var line = document.createElement("div");
+    line.textContent = msg;
+    el.prepend(line);
+  }
+
+  function pInfo(label, value) {
+    return '<div class="panel-info-line"><span>' + label + '</span><b>' + value + '</b></div>';
+  }
+
+  async function renderPanel() {
+    var roleEl = $("#panel-role");
+    if (roleEl) roleEl.textContent = myRole === "owner" ? "овнер" : "админ";
+    var adminCard = $("#panel-admin-card");
+    if (adminCard) adminCard.classList.toggle("hidden", myRole !== "owner");
+    var game = $("#panel-game");
+    if (game) {
+      game.innerHTML =
+        '<button class="btn" data-act="p-start">Кинуть монету</button>' +
+        '<button class="btn" data-act="p-newround">Новый раунд</button>' +
+        '<button class="btn" data-act="p-round">Сбросить раунды</button>' +
+        '<button class="btn" data-act="p-reset">Перезапуск (онлайн)</button>';
+    }
+    var info = $("#panel-info");
+    if (!info) return;
+    try {
+      var room = await api("/rooms/" + ROOM_ID);
+      if (!room) { info.innerHTML = pInfo("Стол", "пусто"); return; }
+      var now = Date.now(), on = 0, pr = room.presence || {};
+      Object.keys(pr).forEach(function (k) { if (pr[k] && now - (Number(pr[k].at) || 0) < 50000) on++; });
+      var bans = 0;
+      try { bans = Object.keys((await api("/bans")) || {}).length; } catch (e) {}
+      info.innerHTML = '<h3>Стол</h3>' +
+        pInfo("Раунд", room.round || 1) +
+        pInfo("Фаза", room.phase || "—") +
+        pInfo("Банк", room.pot || 0) +
+        pInfo("Игроков", Object.keys(room.players || {}).length) +
+        pInfo("Онлайн", on) +
+        pInfo("Забанено", bans);
+    } catch (e) {
+      info.innerHTML = pInfo("Ошибка", e.message);
+    }
+  }
+
+  function openPanel() {
+    if (!myRole) { toast("Нет доступа к панели", true); return; }
+    showOnly("#screen-panel");
+    document.title = "Монетка — панель";
+    renderPanel();
+  }
+
+  async function panelPlayers() {
+    var room = (await api("/rooms/" + ROOM_ID)) || {};
+    var map = {}, profiles = {};
+    try { profiles = (await api("/players")) || {}; } catch (e) {}
+    Object.keys(profiles).forEach(function (k) {
+      var p = profiles[k];
+      if (p && !p.blocked) map[k] = { name: p.name || "Игрок" };
+    });
+    Object.keys(room.players || {}).forEach(function (k) {
+      var p = room.players[k] || {};
+      map[k] = { name: p.name || (map[k] && map[k].name) || "Игрок" };
+    });
+    return { room: room, map: map };
+  }
+
+  function pickTargets(map, room, name) {
+    var q = String(name || "").trim().toLowerCase();
+    var entries = Object.keys(map).map(function (k) { return [k, map[k]]; });
+    if (!q) return entries;
+    var roomKeys = Object.keys((room && room.players) || {});
+    var inRoom = entries.filter(function (e) { return roomKeys.indexOf(e[0]) >= 0 && e[1].name.toLowerCase().indexOf(q) >= 0; });
+    if (inRoom.length) return inRoom;
+    var exact = entries.filter(function (e) { return e[1].name.toLowerCase() === q; });
+    if (exact.length) return exact;
+    return entries.filter(function (e) { return e[1].name.toLowerCase().indexOf(q) >= 0; });
+  }
+
+  function panelFlip(room) {
+    var players = room.players || {};
+    var alive = Object.keys(players).filter(function (k) { return Number(players[k].bet) > 0 && !players[k].out; });
+    if (alive.length < 2) return { error: "Нужно минимум 2 ставки" };
+    var survivors = [], missed = [];
+    alive.forEach(function (k) { (Math.random() < 0.5 ? survivors : missed).push(k); });
+    if (!survivors.length) survivors = alive.slice();
+    else missed.forEach(function (k) { players[k].out = true; });
+    survivors.forEach(function (k) { players[k].side = null; });
+    room.stage = (Number(room.stage) || 0) + 1;
+    room.lastFlip = { result: Math.random() < 0.5 ? "H" : "T", at: Date.now(), stage: room.stage };
+    if (survivors.length === 1) {
+      room.winner = survivors[0];
+      room.prize = Number(room.pot) || 0;
+      room.winSide = null;
+      var results = {};
+      Object.keys(players).forEach(function (k) {
+        var b = Number(players[k].bet) || 0;
+        if (b > 0) results[k] = { name: players[k].name || "Игрок", bet: b, delta: k === survivors[0] ? room.prize - b : -b };
+      });
+      room.rounds = room.rounds || {};
+      room.rounds[String(room.round)] = results;
+      var keys = Object.keys(room.rounds).map(Number).sort(function (a, b) { return a - b; });
+      while (keys.length > 20) delete room.rounds[String(keys.shift())];
+      room.phase = "result";
+      room.awarded = false;
+    } else {
+      room.phase = "flipping";
+    }
+    return { room: room, survivors: survivors.length };
+  }
+
+  function panelNewRound(room) {
+    room.round = (Number(room.round) || 1) + 1;
+    room.phase = "betting"; room.pot = 0; room.stage = 0; room.lastFlip = null;
+    room.winner = null; room.prize = 0; room.winSide = null; room.awarded = true;
+    Object.keys(room.players || {}).forEach(function (k) {
+      room.players[k].bet = 0; room.players[k].side = null; room.players[k].out = false;
+    });
+    return room;
+  }
+
+  async function panelAction(act) {
+    if (!myRole) return;
+    var name = ($("#panel-name") && $("#panel-name").value || "").trim();
+    var newName = ($("#panel-new") && $("#panel-new").value || "").trim();
+    try {
+      var room = await api("/rooms/" + ROOM_ID);
+      if (!room) { panelLog("Комната пуста"); return; }
+      if (act === "p-start") {
+        if (room.phase === "result") {
+          panelNewRound(room);
+          await api("/rooms/" + ROOM_ID, "PUT", room);
+          panelLog("Новый раунд " + room.round);
+        } else {
+          var res = panelFlip(room);
+          if (res.error) { panelLog(res.error); return; }
+          await api("/rooms/" + ROOM_ID, "PUT", res.room);
+          panelLog(res.room.phase === "result"
+            ? "Победитель: " + ((res.room.players[res.room.winner] || {}).name || "?")
+            : "Продолжают " + res.survivors);
+        }
+      } else if (act === "p-newround") {
+        panelNewRound(room);
+        await api("/rooms/" + ROOM_ID, "PUT", room);
+        panelLog("Новый раунд " + room.round);
+      } else if (act === "p-round") {
+        room.round = 1; room.phase = "betting"; room.pot = 0; room.stage = 0;
+        room.lastFlip = null; room.winner = null; room.prize = 0; room.winSide = null; room.awarded = true; room.rounds = {};
+        Object.keys(room.players || {}).forEach(function (k) { room.players[k].bet = 0; room.players[k].side = null; room.players[k].out = false; });
+        await api("/rooms/" + ROOM_ID, "PUT", room);
+        panelLog("Все раунды сброшены");
+      } else if (act === "p-reset") {
+        var now = Date.now(), online = room.presence || {}, players = {};
+        Object.keys(online).forEach(function (k) {
+          if (online[k] && now - (Number(online[k].at) || 0) < 50000) {
+            var p = (room.players || {})[k] || {};
+            players[k] = { name: p.name || online[k].name || "Игрок", bet: 0, side: null, out: false };
+          }
+        });
+        if (!Object.keys(players).length) {
+          await api("/rooms/" + ROOM_ID, "DELETE");
+          panelLog("Комната очищена");
+        } else {
+          room.round = 1; room.phase = "betting"; room.pot = 0; room.stage = 0; room.lastFlip = null;
+          room.winner = null; room.prize = 0; room.winSide = null; room.awarded = true; room.rounds = {};
+          room.players = players;
+          await api("/rooms/" + ROOM_ID, "PUT", room);
+          panelLog("Перезапуск, игроков: " + Object.keys(players).length);
+        }
+      } else if (act.indexOf("p-") === 0) {
+        if (myRole !== "owner") { panelLog("Только овнер"); return; }
+        var data = await panelPlayers();
+        var targets = pickTargets(data.map, data.room, name);
+        if (!targets.length) { panelLog("Игрок не найден"); return; }
+        if (act === "p-ban") {
+          var t1 = Date.now();
+          for (var i = 0; i < targets.length; i++) {
+            var k = targets[i][0];
+            await api("/bans/" + k, "PUT", { name: targets[i][1].name, at: t1 });
+            await api("/rooms/" + ROOM_ID + "/players/" + k, "DELETE");
+            await api("/rooms/" + ROOM_ID + "/presence/" + k, "DELETE");
+            panelLog("Забанен: " + targets[i][1].name);
+          }
+        } else if (act === "p-unban") {
+          var bans = (await api("/bans")) || {};
+          var q = name.toLowerCase();
+          var bt = Object.keys(bans).filter(function (k) { return !q || String((bans[k] && bans[k].name) || "").toLowerCase().indexOf(q) >= 0; });
+          if (!bt.length) panelLog("Забаненных не найдено");
+          for (var j = 0; j < bt.length; j++) {
+            await api("/bans/" + bt[j], "DELETE");
+            panelLog("Разбанен: " + ((bans[bt[j]] || {}).name || bt[j]));
+          }
+        } else if (act === "p-rename") {
+          if (newName.length < 2) { panelLog("Введите новое имя"); return; }
+          for (var n = 0; n < targets.length; n++) {
+            var key = targets[n][0], rec = null;
+            try { rec = await api("/players/" + key); } catch (e) {}
+            if (rec && rec.name) { rec.name = newName; delete rec.blocked; await api("/players/" + key, "PUT", rec); }
+            await api("/rooms/" + ROOM_ID + "/players/" + key, "PATCH", { name: newName });
+            await api("/rooms/" + ROOM_ID + "/presence/" + key, "PATCH", { name: newName });
+            panelLog(targets[n][1].name + " → " + newName);
+          }
+        } else if (act === "p-clear-name") {
+          for (var c = 0; c < targets.length; c++) {
+            var ck = targets[c][0];
+            await api("/players/" + ck, "PUT", { name: "", balance: 0, blocked: true });
+            await api("/rooms/" + ROOM_ID + "/players/" + ck, "DELETE");
+            await api("/rooms/" + ROOM_ID + "/presence/" + ck, "DELETE");
+            panelLog("Удалён: " + targets[c][1].name);
+          }
+        } else if (act === "p-clear-all") {
+          await api("/players", "DELETE");
+          await api("/rooms/" + ROOM_ID, "DELETE");
+          panelLog("Все игроки удалены");
+        }
+      }
+    } catch (e) {
+      panelLog("Ошибка: " + e.message);
+    }
+    renderPanel();
+  }
   /* ---------------- events ---------------- */
   document.addEventListener("click", function (e) {
     var target = e.target.closest ? e.target.closest("[data-act],[data-amt]") : null;
@@ -1335,6 +1639,12 @@ window.FIREBASE_CONFIG = {
 
     var act = target.getAttribute("data-act");
     switch (act) {
+      case "open-panel": openPanel(); break;
+      case "panel-close": if (state) { showOnly("#screen-room"); document.title = "Монетка — общий стол"; } else showLogin(); break;
+      case "p-start": case "p-newround": case "p-round": case "p-reset":
+      case "p-ban": case "p-unban": case "p-rename": case "p-clear-name": case "p-clear-all":
+        panelAction(act).catch(function (e) { panelLog("Ошибка: " + e.message); });
+        break;
       case "cancel-bet":
         cancelBet().catch(function () { toast("Не удалось отменить ставку", true); });
         break;
@@ -1427,7 +1737,10 @@ window.FIREBASE_CONFIG = {
     if (saved) {
       me = saved;
       saveLocalProfile(saved.name);
+      await loadRole();
       await enterSingleRoom();
+      updatePanelButton();
+      if (location.hash.indexOf("panel") >= 0 && myRole) openPanel();
     } else {
       showLogin();
       var f = $("#fio");

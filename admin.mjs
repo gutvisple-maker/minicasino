@@ -412,6 +412,57 @@ async function rename(oldName, newName) {
   }
 }
 
+const SITE = process.env.SITE || "https://gutvisple-maker.github.io/minicasino/";
+
+async function setRole(name, role) {
+  const query = String(name || "").trim().toLowerCase();
+  if (!query) {
+    console.log(`Укажите имя: node admin.mjs ${role} "Тимур"`);
+    return;
+  }
+  const room = await getRoom();
+  const all = await collectPlayers(room || {});
+  const targets = resolveTargets(all, room, name);
+  if (!targets.length) {
+    console.log(`Никого не нашли по «${name}»`);
+    return;
+  }
+  const now = Date.now();
+  for (const [key, p] of targets) {
+    await http(`/roles/${key}`, "PUT", { role, name: p.name, at: now });
+    console.log(`${p.name} → ${role === "owner" ? "овнер" : "админ"} (${key.slice(0, 8)}…)`);
+  }
+  console.log(`Панель: ${SITE}#panel`);
+}
+
+async function roles() {
+  let data = null;
+  try { data = await http("/roles"); } catch (e) {
+    if (/401|403/.test(e.message)) { console.log("Нет доступа к ролям — опубликуйте database.rules.json."); return; }
+    throw e;
+  }
+  const list = Object.entries(data || {});
+  if (!list.length) { console.log("Ролей нет."); return; }
+  for (const [key, r] of list) {
+    console.log(`${r.role === "owner" ? "овнер" : "админ"}: ${r.name || "?"} (${key.slice(0, 8)}…)`);
+  }
+}
+
+async function unrole(name) {
+  const query = String(name || "").trim().toLowerCase();
+  let data = null;
+  try { data = await http("/roles"); } catch (e) {
+    if (/401|403/.test(e.message)) { console.log("Нет доступа к ролям — опубликуйте database.rules.json."); return; }
+    throw e;
+  }
+  const targets = Object.entries(data || {}).filter(([, r]) => !query || String((r && r.name) || "").toLowerCase().includes(query));
+  if (!targets.length) { console.log("Ничего не найдено."); return; }
+  for (const [key, r] of targets) {
+    await del(`/roles/${key}`);
+    console.log(`Снята роль: ${(r && r.name) || key}`);
+  }
+}
+
 async function wipe() {
   const room = await getRoom();
   if (room) {
@@ -455,6 +506,10 @@ function help() {
   console.log('  rename "Саша" "Алекс" — переименовать');
   console.log("  wipe                  — удалить всех и перезапустить");
   console.log("  update                — скачать последнюю версию admin.mjs");
+  console.log('  admin "Тимур"         — дать роль админа (панель #panel)');
+  console.log('  owner "Тимур"         — дать роль овнера (все права)');
+  console.log("  roles                 — список ролей");
+  console.log('  unrole "Тимур"        — снять роль');
   console.log("");
   console.log("Без команды: node admin.mjs — интерактивный режим, команды по одной строке.");
 }
@@ -477,13 +532,17 @@ function runCommand(cmd, args) {
     case "reset": return reset();
     case "wipe": return wipe();
     case "update": return update();
+    case "admin": return setRole(args[0], "admin");
+    case "owner": return setRole(args[0], "owner");
+    case "roles": return roles();
+    case "unrole": return unrole(args[0]);
     case "clear": return clear(args.join(" "));
     case "ban": return ban(args.join(" "));
     case "unban": return unban(args.join(" "));
     case "rename": return rename(args[0], args[1]);
     case "help": return help();
     default:
-      console.log("Неизвестно. Доступно: status | start | newround | round | reset | clear | ban | unban | rename | wipe | update");
+      console.log("Неизвестно. Доступно: status | start | newround | round | reset | clear | ban | unban | rename | wipe | update | admin | owner | roles | unrole");
       return Promise.resolve();
   }
 }
